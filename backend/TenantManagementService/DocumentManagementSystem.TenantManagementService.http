@@ -1,0 +1,6 @@
+@DocumentManagementSystem.TenantManagementService_HostAddress = http://localhost:5101
+
+GET {{DocumentManagementSystem.TenantManagementService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
