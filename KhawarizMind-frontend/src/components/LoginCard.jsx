@@ -17,7 +17,8 @@ export default function LoginCard({ onLogin }) {
   const handleLogin = () => {
     if (username.trim() && password.trim()) {
       onLogin?.({ username });
-      navigate("/dashboard");
+      sessionStorage.setItem("km-username", username.trim());
+      navigate("/dashboard", { state: { username: username.trim() } });
     }
   };
 

@@ -50,7 +50,7 @@ export default function AIAssistantPanel({ open, onClose }) {
 
     // TODO: Connect to AIService; this is a stubbed response
     setTimeout(() => {
-      setMsgs((m) => [...m, { role: "assistant", text: "Got it. (Connect AIService for real responses.)" }]);
+      setMsgs((m) => [...m, { role: "assistant", text: t("AIStubResponse") }]);
     }, 400);
     setInput("");
   };
@@ -83,7 +83,7 @@ export default function AIAssistantPanel({ open, onClose }) {
       <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
         <Stack direction="row" spacing={1}>
           <TextField
-            placeholder={t("AIPanelWelcome")}
+            placeholder={t("AIInputPlaceholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             fullWidth

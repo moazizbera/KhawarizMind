@@ -38,7 +38,7 @@ const createEmotionCache = (isRtl) =>
 function AppContent() {
   const { lang, toggleLanguage } = useLanguage();
   const { mode, toggleTheme } = useThemeMode();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const isRtl = lang === "ar";
 
@@ -93,7 +93,13 @@ function AppContent() {
               gap: 1,
             }}
           >
-            <Tooltip title={mode === "dark" ? "Switch to Light" : "Switch to Dark"}>
+            <Tooltip
+              title={
+                mode === "dark"
+                  ? t("SwitchToLight")
+                  : t("SwitchToDark")
+              }
+            >
               <IconButton
                 onClick={toggleTheme}
                 sx={{
@@ -106,7 +112,7 @@ function AppContent() {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Switch Language / تبديل اللغة">
+            <Tooltip title={t("ToggleLanguage")}>
               <IconButton
                 onClick={toggleLanguage}
                 sx={{
@@ -124,7 +130,7 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<Hero />} />
               <Route path="/login" element={<LoginCard />} />
-              <Route path="/dashboard" element={<DashboardShell />} />
+              <Route path="/dashboard/*" element={<DashboardShell />} />
             </Routes>
           </AnimatePresence>
         </Router>
