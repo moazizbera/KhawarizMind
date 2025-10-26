@@ -1,6 +1,0 @@
-@DocumentManagementSystem.DocumentService_HostAddress = http://localhost:5255
-
-GET {{DocumentManagementSystem.DocumentService_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
