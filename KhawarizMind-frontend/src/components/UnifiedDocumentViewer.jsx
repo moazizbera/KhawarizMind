@@ -1,26 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Typography, CircularProgress, Paper } from "@mui/material";
 import { Document, Page, pdfjs } from "react-pdf";
+import { useTranslation } from "react-i18next";
 
-
-
-// ✅ Modern CSS imports (no longer under /esm/)
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 
-// ✅ Load worker automatically from pdfjs-dist (works in React 18+)
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
   import.meta.url
 ).toString();
 
 export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
+  const { t } = useTranslation();
   const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
   const [fileType, setFileType] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Detect file type from extension
   useEffect(() => {
     if (!fileName && !fileUrl) return;
     const ext = (fileName || fileUrl)?.split(".").pop().toLowerCase();
@@ -28,32 +24,32 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
     setLoading(false);
   }, [fileUrl, fileName]);
 
-  // ✅ Helper for Office viewer
   const getOfficeViewerUrl = (url) =>
     `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
 
-  if (loading)
+  if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
         <CircularProgress />
       </Box>
     );
+  }
 
-  // 🧾 PDF Files
   if (["pdf"].includes(fileType)) {
     return (
       <Paper sx={{ p: 2, height: "100%", overflow: "auto" }}>
-        <Typography variant="h6" gutterBottom>PDF Viewer</Typography>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+          {t("PdfViewerTitle")}
+        </Typography>
         <Document file={fileUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
-          {Array.from(new Array(numPages), (el, index) => (
-            <Page key={`page_${index + 1}`} pageNumber={index + 1} scale={1.2} />
+          {Array.from({ length: numPages || 0 }, (_, index) => (
+            <Page key={`page_${index + 1}`} pageNumber={index + 1} scale={1.15} />
           ))}
         </Document>
       </Paper>
     );
   }
 
-  // 📄 Office files
   if (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(fileType)) {
     return (
       <Box sx={{ width: "100%", height: "100%", border: "none" }}>
@@ -62,13 +58,12 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
           width="100%"
           height="100%"
           frameBorder="0"
-          title="Office Document Viewer"
+          title={t("OfficeViewerTitle")}
         />
       </Box>
     );
   }
 
-  // 🖼️ Images
   if (["png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff"].includes(fileType)) {
     return (
       <Box
@@ -94,7 +89,6 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
     );
   }
 
-  // ❌ Unsupported
   return (
     <Box
       sx={{
@@ -103,13 +97,15 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
         justifyContent: "center",
         alignItems: "center",
         height: "100%",
+        textAlign: "center",
+        px: 2,
       }}
     >
-      <Typography variant="h6" color="error">
-        Unsupported file type
+      <Typography variant="h6" color="error" sx={{ fontWeight: 600 }}>
+        {t("UnsupportedFileType")}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        ({fileType}) cannot be previewed.
+        {t("UnsupportedFileMessage", { fileType })}
       </Typography>
     </Box>
   );

@@ -20,11 +20,23 @@ i18n.use(initReactI18next).init({
           "Your intelligent ECM AI Assistant — inspired by Al-Khwarizmi’s legacy of logic and innovation.",
         GetStarted: "Get Started",
         ViewOnGitHub: "View on GitHub",
+        SwitchToLight: "Switch to light mode",
+        SwitchToDark: "Switch to dark mode",
+        ToggleLanguage: "Switch language",
         // Login
         Login: "Login",
         Username: "Username",
         Password: "Password",
         SignIn: "Sign In",
+        GuestUser: "Guest",
+        Dashboard: "Dashboard",
+        DashboardWelcomeTitle: "Welcome, {{name}}",
+        DashboardWelcomeSubtitle:
+          "Monitor document intelligence, orchestrate workflows, and collaborate securely across your enterprise.",
+        WorkflowsDescription:
+          "Design and automate content lifecycles with drag-and-drop orchestration, SLA tracking, and business rules.",
+        SettingsDescription:
+          "Manage tenant preferences, integrations, security, and localized experiences for your organization.",
         // Documents module
         DocumentName: "Document Name",
         Type: "Type",
@@ -36,6 +48,8 @@ i18n.use(initReactI18next).init({
         // AI panel
         AIPanelWelcome:
           "Hello! I’m KhawarizMind. Ask me to classify, extract, or summarize documents.",
+        AIStubResponse: "Got it. (Connect AIService for real responses.)",
+        AIInputPlaceholder: "Ask something about your documents…",
         Send: "Send",
         // Viewer titles
         ImageProcessingViewer: "Image Processing Viewer",
@@ -43,6 +57,17 @@ i18n.use(initReactI18next).init({
         Maximize: "Maximize",
         Restore: "Restore",
         Close: "Close",
+        ImageProcessing: "Image Processing",
+        ImageAltText: "Scanned document",
+        ZoomIn: "Zoom In",
+        ZoomOut: "Zoom Out",
+        Rotate: "Rotate",
+        Reset: "Reset",
+        ZoomLevel: "Zoom level",
+        PdfViewerTitle: "PDF Viewer",
+        OfficeViewerTitle: "Office Document Viewer",
+        UnsupportedFileType: "Unsupported file type",
+        UnsupportedFileMessage: "({{fileType}}) cannot be previewed.",
       },
     },
     ar: {
@@ -62,11 +87,23 @@ i18n.use(initReactI18next).init({
           "مساعد إدارة المحتوى الذكي المستوحى من إرث الخوارزمي في المنطق والابتكار.",
         GetStarted: "ابدأ الآن",
         ViewOnGitHub: "استعرض على GitHub",
+        SwitchToLight: "التبديل إلى الوضع الفاتح",
+        SwitchToDark: "التبديل إلى الوضع الداكن",
+        ToggleLanguage: "تبديل اللغة",
         // Login
         Login: "تسجيل الدخول",
         Username: "اسم المستخدم",
         Password: "كلمة المرور",
         SignIn: "تسجيل الدخول",
+        GuestUser: "زائر",
+        Dashboard: "لوحة التحكم",
+        DashboardWelcomeTitle: "مرحباً، {{name}}",
+        DashboardWelcomeSubtitle:
+          "راقب ذكاء المستندات، ونظم سير العمل، وتعاون بأمان عبر مؤسستك.",
+        WorkflowsDescription:
+          "صمم سير عمل المحتوى وأتمتته مع المخططات التفاعلية، وتتبع مؤشرات الخدمة، وقواعد الأعمال.",
+        SettingsDescription:
+          "أدر تفضيلات الجهة، والتكاملات، والأمان، والتجربة المحلية لفريقك.",
         // Documents module
         DocumentName: "اسم المستند",
         Type: "النوع",
@@ -78,6 +115,8 @@ i18n.use(initReactI18next).init({
         // AI panel
         AIPanelWelcome:
           "مرحباً! أنا عقل الخوارزمي. اطلب مني تصنيف المستندات أو استخراج البيانات أو تلخيصها.",
+        AIStubResponse: "تم استلام الطلب. (قم بربط خدمة الذكاء الاصطناعي للحصول على استجابات فعلية.)",
+        AIInputPlaceholder: "اكتب سؤالك حول المستندات…",
         Send: "إرسال",
         // Viewer titles
         ImageProcessingViewer: "عارض معالجة الصور",
@@ -85,6 +124,17 @@ i18n.use(initReactI18next).init({
         Maximize: "تكبير",
         Restore: "استعادة",
         Close: "إغلاق",
+        ImageProcessing: "معالجة الصور",
+        ImageAltText: "مستند ممسوح ضوئياً",
+        ZoomIn: "تكبير",
+        ZoomOut: "تصغير",
+        Rotate: "تدوير",
+        Reset: "إعادة ضبط",
+        ZoomLevel: "مستوى التكبير",
+        PdfViewerTitle: "عارض ملفات PDF",
+        OfficeViewerTitle: "عارض مستندات أوفيس",
+        UnsupportedFileType: "نوع ملف غير مدعوم",
+        UnsupportedFileMessage: "لا يمكن معاينة ({{fileType}}).",
       },
     },
   },
