@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
   (typeof window !== "undefined"
     ? window.__KM_API_BASE_URL__
@@ -80,6 +80,25 @@ export async function queryAI(prompt, options = {}) {
   };
   const { data } = await apiClient.post("/api/ai/query", payload);
   return data;
+}
+
+export async function summarizeAI(options = {}) {
+  const { data } = await apiClient.post("/api/ai/summarize", options);
+  return data;
+}
+
+export async function fetchAiActions(options = {}) {
+  const { data } = await apiClient.post("/api/ai/actions", options);
+  return data;
+}
+
+export function getStoredAuthToken() {
+  if (typeof window === "undefined") return null;
+  return (
+    window.sessionStorage.getItem("km-token") ||
+    window.localStorage.getItem("km-token") ||
+    null
+  );
 }
 
 export function setAuthToken(token, persist = false) {
