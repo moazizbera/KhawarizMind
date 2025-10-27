@@ -1,25 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Paper,
-  Typography,
-  TextField,
-  InputAdornment,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  TableSortLabel,
+  Alert,
+  Box,
   Button,
+  Chip,
+  CircularProgress,
+  Chip,
+  Tooltip,
+  LinearProgress,
+  Grid,
+  InputAdornment,
+  LinearProgress,
+  Paper,
+  Snackbar,
   Stack,
   Skeleton,
   Snackbar,
   Alert,
   CircularProgress,
 } from "@mui/material";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PersonIcon from "@mui/icons-material/Person";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
@@ -70,6 +74,54 @@ const FALLBACK_DOCS = [
   },
   { name: "Blueprint_Scan.jpg", type: "jpg", url: "/sample-scan.jpg" },
 ];
+
+const pipelineStepsTemplate = (t) => [
+  { key: "upload", label: t("PipelineUpload") },
+  { key: "ingest", label: t("PipelineIngest") },
+  { key: "classify", label: t("PipelineClassify") },
+  { key: "enrich", label: t("PipelineEnrich") },
+  { key: "complete", label: t("PipelineComplete") },
+];
+
+const normalizeArray = (value) => (Array.isArray(value) ? value : []);
+
+const normalizeOcrLayers = (payload) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.layers)) return payload.layers;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const normalizeAnnotations = (payload) => {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
+function CustomToolbar({ isRtl }) {
+  const { t } = useTranslation();
+  return (
+    <GridToolbarContainer
+      sx={{
+        flexDirection: isRtl ? "row-reverse" : "row",
+        gap: 1,
+        justifyContent: "space-between",
+        p: 1,
+      }}
+    >
+      <Stack direction="row" spacing={1} alignItems="center">
+        <GridToolbarFilterButton />
+        <GridToolbarExport />
+      </Stack>
+      <GridToolbarQuickFilter
+        quickFilterParser={(value) => value.split(/\s+/).filter(Boolean)}
+        placeholder={t("SearchPlaceholder")}
+      />
+    </GridToolbarContainer>
+  );
+}
 
 export default function Documents({ onOpenDocViewer, onOpenImage }) {
   const { t } = useTranslation();
@@ -296,32 +348,137 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
         </Stack>
       </Stack>
 
-      {/* Table */}
-      <TableContainer sx={{ mt: 2 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell sortDirection={orderBy === "name" ? order : false}>
-                <TableSortLabel
-                  active={orderBy === "name"}
-                  direction={orderBy === "name" ? order : "asc"}
-                  onClick={() => handleSort("name")}
-                >
-                  {t("DocumentName")}
-                </TableSortLabel>
-              </TableCell>
-              <TableCell
-                sortDirection={orderBy === "type" ? order : false}
-                width={120}
+        {pipelineSteps.length > 0 && (
+          <Box sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", p: 2 }}>
+            <Stack spacing={1}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                {pipelineSteps.map((step) => (
+                  <Chip
+                    key={step.key}
+                    label={`${step.label}${step.detail ? ` · ${step.detail}` : ""}`}
+                    color={
+                      step.status === "success"
+                        ? "success"
+                        : step.status === "active"
+                        ? "info"
+                        : step.status === "error"
+                        ? "error"
+                        : "default"
+                    }
+                    variant={step.status === "pending" ? "outlined" : "filled"}
+                    sx={{
+                      mb: 1,
+                    }}
+                  />
+                ))}
+              </Stack>
+              {(uploading || pipelineRunning) && <LinearProgress />}
+            </Stack>
+          </Box>
+        )}
+
+        <Paper variant="outlined" sx={{ height: 520, position: "relative" }}>
+          <DataGrid
+            rows={documents}
+            columns={columns}
+            autoHeight={false}
+            density="compact"
+            disableRowSelectionOnClick
+            checkboxSelection
+            onRowSelectionModelChange={(model) => setSelectionModel(model)}
+            rowSelectionModel={selectionModel}
+            loading={loading && documents.length === 0}
+            filterModel={filterModel}
+            onFilterModelChange={setFilterModel}
+            slots={{ toolbar: CustomToolbar }}
+            slotProps={{ toolbar: { isRtl } }}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50]}
+            sx={{
+              direction: isRtl ? "rtl" : "ltr",
+              "& .MuiDataGrid-cell": { alignItems: "center" },
+              "& .MuiDataGrid-toolbarContainer": {
+                flexDirection: isRtl ? "row-reverse" : "row",
+              },
+            }}
+          />
+          {loading && documents.length > 0 && (
+            <LinearProgress sx={{ position: "absolute", left: 0, right: 0, bottom: 0 }} />
+          )}
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Grid
+            container
+            spacing={2}
+            alignItems="center"
+            justifyContent="space-between"
+            direction={isRtl ? "row-reverse" : "row"}
+          >
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {t("BulkActions")}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t("SelectedCount", { count: selectionModel.length })}
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
+                  <TextField
+                    size="small"
+                    value={bulkTagValue}
+                    onChange={(event) => setBulkTagValue(event.target.value)}
+                    placeholder={t("TagPlaceholder")}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <TagIcon fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      minWidth: { xs: "100%", sm: 220 },
+                      direction: isRtl ? "rtl" : "ltr",
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handleBulkTagApply}
+                    disabled={!bulkTagValue.trim() || selectionModel.length === 0}
+                  >
+                    {t("ApplyTag")}
+                  </Button>
+                  <Button
+                    variant="text"
+                    color="secondary"
+                    onClick={handleBulkTagClear}
+                    disabled={selectionModel.length === 0}
+                  >
+                    {t("ClearTags")}
+                  </Button>
+                </Stack>
+              </Stack>
+            </Grid>
+            <Grid item xs={12} md={5}>
+              <Stack
+                spacing={1}
+                alignItems={isRtl ? "flex-end" : "flex-start"}
+                direction={isRtl ? "row-reverse" : "row"}
+                justifyContent={isRtl ? "flex-start" : "flex-end"}
               >
-                <TableSortLabel
-                  active={orderBy === "type"}
-                  direction={orderBy === "type" ? order : "asc"}
-                  onClick={() => handleSort("type")}
+                <Button
+                  variant="outlined"
+                  onClick={() => handleOpenImage(selectedDocForImage)}
+                  startIcon={<LayersIcon />}
+                  disabled={!documents.length}
                 >
                   {t("Type")}
                 </TableSortLabel>
               </TableCell>
+              <TableCell width={180}>{t("AssignedTo")}</TableCell>
+              <TableCell width={140}>{t("Status")}</TableCell>
+              <TableCell width={220}>{t("SLA")}</TableCell>
               <TableCell align="center" width={140}>
                 {t("Action")}
               </TableCell>

@@ -16,6 +16,8 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
   const [numPages, setNumPages] = useState(null);
   const [fileType, setFileType] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showOcr, setShowOcr] = useState(true);
+  const [showAnnotations, setShowAnnotations] = useState(true);
 
   useEffect(() => {
     if (!fileName && !fileUrl) return;
@@ -46,6 +48,11 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
             <Page key={`page_${index + 1}`} pageNumber={index + 1} scale={1.15} />
           ))}
         </Document>
+        {numPages === 0 && (
+          <Typography variant="body2" color="text.secondary">
+            {t("NoPagesAvailable")}
+          </Typography>
+        )}
       </Paper>
     );
   }
@@ -69,19 +76,30 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
       <Box
         sx={{
           display: "flex",
-          justifyContent: "center",
+          flexDirection: "column",
+          gap: 2,
           alignItems: "center",
           height: "100%",
           bgcolor: "background.paper",
+          p: 2,
         }}
       >
-        <img
+        <Stack spacing={1} sx={{ width: "100%" }}>
+          {renderMetadata()}
+          {!ocrLayers.length && (
+            <Typography variant="body2" color="text.secondary">
+              {t("NoOcrAvailable")}
+            </Typography>
+          )}
+        </Stack>
+        <Box
+          component="img"
           src={fileUrl}
           alt={fileName}
-          style={{
+          sx={{
             maxWidth: "100%",
             maxHeight: "90vh",
-            borderRadius: 8,
+            borderRadius: 2,
             boxShadow: "0 2px 20px rgba(0,0,0,0.3)",
           }}
         />

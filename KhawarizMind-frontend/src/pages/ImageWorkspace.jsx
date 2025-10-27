@@ -9,6 +9,9 @@ const mockOCR = [
 ];
 
 export default function ImageWorkspace() {
+  const contextId = "sample-image";
+  const contextLabel = "sample-scan.jpg";
+
   return (
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Grid container spacing={2}>
@@ -16,7 +19,10 @@ export default function ImageWorkspace() {
           <ImageProcessingViewer imageSrc="/sample-scan.jpg" ocrData={mockOCR} />
         </Grid>
         <Grid item xs={12} md={4}>
-          <AIAssistantPanel />
+          <AIAssistantPanel
+            contextId={contextId}
+            contextLabel={contextLabel}
+          />
         </Grid>
       </Grid>
     </Box>

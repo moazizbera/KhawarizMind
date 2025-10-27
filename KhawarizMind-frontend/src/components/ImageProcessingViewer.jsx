@@ -1,5 +1,15 @@
-import React, { useState } from "react";
-import { Box, Paper, Typography, IconButton, Slider, Stack, Tooltip } from "@mui/material";
+import React, { useMemo, useState } from "react";
+import {
+  Box,
+  FormControlLabel,
+  IconButton,
+  Paper,
+  Slider,
+  Stack,
+  Switch,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
