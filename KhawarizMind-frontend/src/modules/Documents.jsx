@@ -11,6 +11,9 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Chip,
+  Tooltip,
+  LinearProgress,
   Grid,
   InputAdornment,
   LinearProgress,
@@ -24,29 +27,58 @@ import {
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import TagIcon from "@mui/icons-material/Tag";
-import LayersIcon from "@mui/icons-material/Layers";
-import {
-  DataGrid,
-  GridToolbarContainer,
-  GridToolbarExport,
-  GridToolbarFilterButton,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PersonIcon from "@mui/icons-material/Person";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
-import {
-  autoClassifyDocument,
-  enrichDocumentMetadata,
-  getDocumentAnnotations,
-  getDocumentOcrLayers,
-  getDocuments,
-  ingestDocument,
-  uploadDocument,
-} from "../services/api";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { getDocuments, uploadDocument } from "../services/api";
+import StatusChip from "../components/StatusChip";
+import { computeSlaMeta, formatDurationLabel } from "../utils/sla";
 
+function descendingComparator(a, b, orderBy) {
+  if (b[orderBy] < a[orderBy]) return -1;
+  if (b[orderBy] > a[orderBy]) return 1;
+  return 0;
+}
+function getComparator(order, orderBy) {
+  return order === "desc"
+    ? (a, b) => descendingComparator(a, b, orderBy)
+    : (a, b) => -descendingComparator(a, b, orderBy);
+}
+function applySortFilter(rows, comparator, query) {
+  const stabilized = rows.map((el, i) => [el, i]);
+  stabilized.sort((a, b) => {
+    const order = comparator(a[0], b[0]);
+    return order !== 0 ? order : a[1] - b[1];
+  });
+  const sorted = stabilized.map((el) => el[0]);
+  if (!query) return sorted;
+  const q = query.toLowerCase();
+  return sorted.filter((r) => {
+    const status = (r.status || "").toLowerCase();
+    const assignee = (r.assignee || "").toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q) ||
+      status.includes(q) ||
+      assignee.includes(q)
+    );
+  });
+}
+
+const now = Date.now();
 const FALLBACK_DOCS = [
+  {
+    name: "Project_Plan.pdf",
+    type: "pdf",
+    url: "/sample.pdf",
+    status: "in_progress",
+    assignee: "Nina Rivera",
+    slaMinutes: 1440,
+    dueAt: new Date(now + 6 * 60 * 60 * 1000).toISOString(),
+  },
   {
     id: "sample-1",
     name: "Project_Plan.pdf",
@@ -121,6 +153,10 @@ const FALLBACK_DOCS = [
     name: "Financial_Report.xlsx",
     type: "xlsx",
     url: "https://file-examples.com/storage/fe5d32/excel.xlsx",
+    status: "active",
+    assignee: "AI Bot",
+    slaMinutes: 720,
+    dueAt: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
     status: "Queued",
     classification: "Financial",
     tags: ["Finance"],
@@ -140,6 +176,19 @@ const FALLBACK_DOCS = [
     name: "Company_Profile.docx",
     type: "docx",
     url: "https://file-examples.com/storage/fe5d32/doc.docx",
+    status: "completed",
+    assignee: "Fatima Al-Zahra",
+    slaMinutes: 480,
+    dueAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    name: "Blueprint_Scan.jpg",
+    type: "jpg",
+    url: "/sample-scan.jpg",
+    status: "overdue",
+    assignee: "Quality Desk",
+    slaMinutes: 360,
+    dueAt: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
     status: "Processed",
     classification: "Corporate",
     tags: ["HR", "Corporate"],
@@ -306,6 +355,53 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
     return updated;
   }, []);
 
+  const getSlaDetails = useCallback(
+    (item) => {
+      const meta = computeSlaMeta(item?.dueAt, item?.slaMinutes);
+      if (meta.state === "none") {
+        return { meta, label: t("SlaNotDefined"), color: "default" };
+      }
+
+      if (meta.state === "overdue") {
+        return {
+          meta,
+          color: "error",
+          label: t("SlaOverdue", { time: formatDurationLabel(meta.remainingMs, t) }),
+        };
+      }
+
+      if (meta.state === "warning") {
+        return {
+          meta,
+          color: "warning",
+          label: t("SlaDueSoon", { time: formatDurationLabel(meta.remainingMs, t) }),
+        };
+      }
+
+      return {
+        meta,
+        color: "success",
+        label: t("SlaOnTrack", { time: formatDurationLabel(meta.remainingMs, t) }),
+      };
+    },
+    [t]
+  );
+
+  const formatDueDate = useCallback(
+    (value) => {
+      if (!value) return t("SlaNoDueDate");
+      const date = new Date(value);
+      return new Intl.DateTimeFormat(lang === "ar" ? "ar" : "en", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    },
+    [lang, t]
+  );
+
   const fetchDocuments = useCallback(
     async (search = "") => {
       try {
@@ -318,58 +414,17 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
           ? response
           : [];
 
-        const mapped = normalized.map((doc, index) => {
-          const tags = normalizeArray(doc.tags || doc.metadata?.tags);
-          const ocrLayers = normalizeOcrLayers(doc.ocrLayers || doc.ocr);
-          const annotations = normalizeAnnotations(doc.annotations);
-          return {
-            id: doc.id || doc.documentId || doc._id || doc.name || index,
-            name: doc.name || doc.fileName || doc.title || t("DocumentName"),
-            type: (doc.type || doc.mimeType || "").split("/").pop() || "",
-            url:
-              doc.url ||
-              doc.downloadUrl ||
-              doc.previewUrl ||
-              doc.sourceUrl ||
-              "",
-            status:
-              doc.status ||
-              doc.pipelineStatus ||
-              doc.processingStatus ||
-              "Processed",
-            classification:
-              doc.classification ||
-              doc.aiClassification ||
-              doc.metadata?.classification ||
-              "",
-            tags,
-            createdAt:
-              doc.createdAt ||
-              doc.created_at ||
-              doc.ingestedAt ||
-              doc.updatedAt ||
-              new Date().toISOString(),
-            languages: normalizeArray(doc.languages || doc.metadata?.languages),
-            tooltipLocales:
-              doc.tooltipLocales ||
-              doc.localizedTitles ||
-              doc.metadata?.titles ||
-              {},
-            ocrLayers,
-            annotations,
-            imagePreview:
-              doc.previewImage || doc.imagePreview || doc.thumbnailUrl || "",
-            imageOcr: normalizeArray(doc.imageOcr || doc.ocrBoxes),
-            metadata: doc.metadata || {},
-          };
-        });
-
-        const docsWithFallback =
-          mapped.length > 0 ? mapped : [...FALLBACK_DOCS];
-
-        const merged = pipelineDocRef.current
-          ? mergeDocumentRecord(docsWithFallback, pipelineDocRef.current)
-          : docsWithFallback;
+        const mapped = normalized.map((doc) => ({
+          name: doc.name || doc.fileName || doc.title,
+          type: doc.type || doc.mimeType?.split("/").pop() || "",
+          url: doc.url || doc.downloadUrl || doc.previewUrl || "",
+          id: doc.id,
+          createdAt: doc.createdAt,
+          status: doc.status || doc.state || "draft",
+          assignee: doc.assignee || doc.owner || doc.assignedTo || "",
+          slaMinutes: doc.slaMinutes ?? doc.sla?.minutes ?? null,
+          dueAt: doc.dueAt || doc.sla?.dueAt || doc.deadline || null,
+        }));
 
         pipelineDocRef.current = null;
         setDocuments(merged);
@@ -994,12 +1049,142 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
                   startIcon={<LayersIcon />}
                   disabled={!documents.length}
                 >
-                  {t("OpenImageProcessing")}
-                </Button>
-              </Stack>
-            </Grid>
-          </Grid>
-        </Paper>
+                  {t("Type")}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell width={180}>{t("AssignedTo")}</TableCell>
+              <TableCell width={140}>{t("Status")}</TableCell>
+              <TableCell width={220}>{t("SLA")}</TableCell>
+              <TableCell align="center" width={140}>
+                {t("Action")}
+              </TableCell>
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {loading && documents.length === 0
+              ? Array.from({ length: rowsPerPage }).map((_, index) => (
+                  <TableRow key={`skeleton-${index}`}>
+                    <TableCell colSpan={6}>
+                      <Skeleton variant="rounded" height={40} />
+                    </TableCell>
+                  </TableRow>
+                ))
+              : pageRows.map((doc) => {
+                  const sla = getSlaDetails(doc);
+                  const chipColor = sla.color === "default" ? undefined : sla.color;
+                  return (
+                    <TableRow key={doc.id || doc.name} hover>
+                      <TableCell>{doc.name}</TableCell>
+                      <TableCell>{doc.type?.toUpperCase()}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          icon={<PersonIcon fontSize="inherit" />}
+                          label={doc.assignee || t("Unassigned")}
+                          variant={doc.assignee ? "filled" : "outlined"}
+                          color={doc.assignee ? "info" : undefined}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <StatusChip status={doc.status} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={1} alignItems={isRtl ? "flex-end" : "flex-start"}>
+                          <Tooltip title={formatDueDate(doc.dueAt)}>
+                            <Chip
+                              size="small"
+                              icon={<AccessTimeIcon fontSize="inherit" />}
+                              label={sla.label}
+                              color={chipColor}
+                              variant={sla.color === "default" ? "outlined" : "filled"}
+                            />
+                          </Tooltip>
+                          {sla.meta.state !== "none" && (
+                            <LinearProgress
+                              variant="determinate"
+                              value={sla.meta.progress}
+                              sx={(theme) => ({
+                                width: 160,
+                                height: 6,
+                                borderRadius: 999,
+                                backgroundColor: theme.palette.grey[200],
+                                "& .MuiLinearProgress-bar": {
+                                  backgroundColor:
+                                    sla.color === "error"
+                                      ? theme.palette.error.main
+                                      : sla.color === "warning"
+                                      ? theme.palette.warning.main
+                                      : theme.palette.success.main,
+                                },
+                              })}
+                            />
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() =>
+                            onOpenDocViewer({
+                              fileUrl: doc.url,
+                              fileName: doc.name,
+                            })
+                          }
+                          disabled={!doc.url}
+                        >
+                          {t("View")}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+            {!loading && pageRows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <Stack spacing={1} alignItems="center" sx={{ py: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {t("NoResults")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t("NoResultsHint")}
+                    </Typography>
+                    <Button variant="outlined" onClick={handleRefresh}>
+                      {t("ResetFilters")}
+                    </Button>
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Pagination */}
+      <TablePagination
+        component="div"
+        count={filtered.length}
+        page={page}
+        onPageChange={(_, p) => setPage(p)}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(e) => {
+          setRpp(parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[5, 10, 25]}
+      />
+
+      {/* Footer Buttons */}
+      <Stack
+        direction={isRtl ? "row-reverse" : "row"}
+        spacing={2}
+        sx={{ mt: 2 }}
+        justifyContent={isRtl ? "flex-start" : "flex-end"}
+      >
+        <Button variant="outlined" onClick={onOpenImage}>
+          {t("OpenImageProcessing")}
+        </Button>
       </Stack>
 
       <Snackbar

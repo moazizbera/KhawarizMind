@@ -73,66 +73,23 @@ export async function uploadDocument(file, metadata = {}) {
   return data;
 }
 
-export async function ingestDocument(documentId, options = {}) {
-  if (!documentId) {
-    throw new Error("ingestDocument requires a documentId");
-  }
-
-  const { data } = await apiClient.post(
-    `/api/documents/${documentId}/ingest`,
-    options
-  );
-
+export async function getWorkflows(params = {}) {
+  const { data } = await apiClient.get("/api/workflows", { params });
   return data;
 }
 
-export async function autoClassifyDocument(documentId, options = {}) {
-  if (!documentId) {
-    throw new Error("autoClassifyDocument requires a documentId");
-  }
-
-  const { data } = await apiClient.post(
-    `/api/documents/${documentId}/classify`,
-    options
-  );
-
+export async function getWorkflowById(id) {
+  const { data } = await apiClient.get(`/api/workflows/${id}`);
   return data;
 }
 
-export async function enrichDocumentMetadata(documentId, metadata = {}) {
-  if (!documentId) {
-    throw new Error("enrichDocumentMetadata requires a documentId");
+export async function saveWorkflow(payload) {
+  if (payload?.id) {
+    const { id, ...body } = payload;
+    const { data } = await apiClient.put(`/api/workflows/${id}`, body);
+    return data;
   }
-
-  const { data } = await apiClient.post(
-    `/api/documents/${documentId}/metadata`,
-    metadata
-  );
-
-  return data;
-}
-
-export async function getDocumentOcrLayers(documentId) {
-  if (!documentId) {
-    throw new Error("getDocumentOcrLayers requires a documentId");
-  }
-
-  const { data } = await apiClient.get(
-    `/api/documents/${documentId}/ocr`
-  );
-
-  return data;
-}
-
-export async function getDocumentAnnotations(documentId) {
-  if (!documentId) {
-    throw new Error("getDocumentAnnotations requires a documentId");
-  }
-
-  const { data } = await apiClient.get(
-    `/api/documents/${documentId}/annotations`
-  );
-
+  const { data } = await apiClient.post("/api/workflows", payload);
   return data;
 }
 
