@@ -1,10 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Box, Drawer, IconButton, Typography, Divider, TextField, Button, Stack, Paper
+  Box,
+  Drawer,
+  IconButton,
+  Typography,
+  Divider,
+  TextField,
+  Button,
+  Stack,
+  Paper,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
+import { queryAI } from "../services/api";
 
 function Bubble({ role, text }) {
   const isUser = role === "user";
@@ -36,6 +48,8 @@ export default function AIAssistantPanel({ open, onClose }) {
   const [msgs, setMsgs] = useState([
     { role: "assistant", text: t("AIPanelWelcome") },
   ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -43,16 +57,37 @@ export default function AIAssistantPanel({ open, onClose }) {
     setMsgs([{ role: "assistant", text: t("AIPanelWelcome") }]);
   }, [t]);
 
-  const send = () => {
+  const send = async () => {
     if (!input.trim()) return;
-    const userMsg = { role: "user", text: input.trim() };
+    const prompt = input.trim();
+    const userMsg = { role: "user", text: prompt };
     setMsgs((m) => [...m, userMsg]);
-
-    // TODO: Connect to AIService; this is a stubbed response
-    setTimeout(() => {
-      setMsgs((m) => [...m, { role: "assistant", text: t("AIStubResponse") }]);
-    }, 400);
     setInput("");
+    setLoading(true);
+    try {
+      const response = await queryAI(prompt);
+      const assistantText =
+        response?.answer ||
+        response?.data ||
+        response?.message ||
+        t("AIStubResponse");
+      setMsgs((m) => [...m, { role: "assistant", text: assistantText }]);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        t("AIError");
+      setError(message);
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "assistant",
+          text: t("AIErrorMessage"),
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -77,7 +112,30 @@ export default function AIAssistantPanel({ open, onClose }) {
         ref={listRef}
         sx={{ p: 2, overflowY: "auto", flexGrow: 1, display: "flex", flexDirection: "column", gap: 1 }}
       >
-        {msgs.map((m, i) => <Bubble key={i} role={m.role} text={m.text} />)}
+        {msgs.map((m, i) => (
+          <Bubble key={`${m.role}-${i}`} role={m.role} text={m.text} />
+        ))}
+        {loading && (
+          <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                px: 2,
+                py: 1,
+                maxWidth: "80%",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <CircularProgress size={16} />
+              <Typography variant="body2">{t("AIThinking")}</Typography>
+            </Paper>
+          </Stack>
+        )}
       </Box>
       <Divider />
       <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
@@ -88,11 +146,23 @@ export default function AIAssistantPanel({ open, onClose }) {
             onChange={(e) => setInput(e.target.value)}
             fullWidth
             size="small"
-            onKeyDown={(e) => e.key === "Enter" && send()}
+            onKeyDown={(e) => e.key === "Enter" && !loading && send()}
           />
-          <Button variant="contained" onClick={send}>{t("Send")}</Button>
+          <Button variant="contained" onClick={send} disabled={loading}>
+            {loading ? <CircularProgress size={18} color="inherit" /> : t("Send")}
+          </Button>
         </Stack>
       </Box>
+      <Snackbar
+        open={Boolean(error)}
+        autoHideDuration={6000}
+        onClose={() => setError("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+      >
+        <Alert onClose={() => setError("")} severity="error" variant="filled" sx={{ width: "100%" }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Drawer>
   );
 }

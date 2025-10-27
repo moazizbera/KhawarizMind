@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Paper,
   Typography,
@@ -14,10 +14,17 @@ import {
   TableSortLabel,
   Button,
   Stack,
+  Skeleton,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { getDocuments, uploadDocument } from "../services/api";
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) return -1;
@@ -43,15 +50,19 @@ function applySortFilter(rows, comparator, query) {
   );
 }
 
-const SAMPLE_DOCS = [
+const FALLBACK_DOCS = [
   { name: "Project_Plan.pdf", type: "pdf", url: "/sample.pdf" },
-  { name: "Financial_Report.xlsx", type: "xlsx", url: "https://file-examples.com/storage/fe5d32/excel.xlsx" },
-  { name: "Company_Profile.docx", type: "docx", url: "https://file-examples.com/storage/fe5d32/doc.docx" },
+  {
+    name: "Financial_Report.xlsx",
+    type: "xlsx",
+    url: "https://file-examples.com/storage/fe5d32/excel.xlsx",
+  },
+  {
+    name: "Company_Profile.docx",
+    type: "docx",
+    url: "https://file-examples.com/storage/fe5d32/doc.docx",
+  },
   { name: "Blueprint_Scan.jpg", type: "jpg", url: "/sample-scan.jpg" },
-  { name: "HR_Policy.pdf", type: "pdf", url: "/sample.pdf" },
-  { name: "Balance_Sheet.xlsx", type: "xlsx", url: "https://file-examples.com/storage/fe5d32/excel.xlsx" },
-  { name: "Contract_Template.docx", type: "docx", url: "https://file-examples.com/storage/fe5d32/doc.docx" },
-  { name: "Invoice_0001.pdf", type: "pdf", url: "/sample.pdf" },
 ];
 
 export default function Documents({ onOpenDocViewer, onOpenImage }) {
@@ -64,11 +75,77 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
   const [order, setOrder] = useState("asc");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRpp] = useState(5);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
-  const filtered = useMemo(
-    () => applySortFilter(SAMPLE_DOCS, getComparator(order, orderBy), query),
-    [query, order, orderBy]
+  const uploadInputRef = useRef(null);
+
+  const fetchDocuments = useCallback(
+    async (search = "") => {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await getDocuments(
+          search ? { search } : undefined
+        );
+        const normalized = Array.isArray(response?.items)
+          ? response.items
+          : Array.isArray(response)
+          ? response
+          : [];
+
+        const mapped = normalized.map((doc) => ({
+          name: doc.name || doc.fileName || doc.title,
+          type: doc.type || doc.mimeType?.split("/").pop() || "",
+          url: doc.url || doc.downloadUrl || doc.previewUrl || "",
+          id: doc.id,
+          createdAt: doc.createdAt,
+        }));
+
+        setDocuments(mapped);
+      } catch (err) {
+        console.error("Failed to load documents", err);
+        setError(
+          err?.response?.data?.message || err?.message || t("DocumentsLoadError")
+        );
+        setDocuments((prev) => (prev.length === 0 ? FALLBACK_DOCS : prev));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t]
   );
+
+  const initialLoad = useRef(true);
+
+  useEffect(() => {
+    fetchDocuments().finally(() => {
+      initialLoad.current = false;
+    });
+  }, [fetchDocuments]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed === "") {
+      if (!initialLoad.current) {
+        fetchDocuments();
+      }
+      return undefined;
+    }
+
+    const handler = setTimeout(() => {
+      fetchDocuments(trimmed);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [fetchDocuments, query]);
+
+  const filtered = useMemo(() => {
+    if (loading && documents.length === 0) return [];
+    return applySortFilter(documents, getComparator(order, orderBy), query);
+  }, [documents, order, orderBy, query, loading]);
   const pageRows = useMemo(
     () => filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [filtered, page, rowsPerPage]
@@ -78,6 +155,29 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
     setOrderBy(property);
+  };
+
+  const handleRefresh = () => {
+    fetchDocuments(query.trim());
+  };
+
+  const handleUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploading(true);
+      setError("");
+      await uploadDocument(file);
+      setUploadSuccess(true);
+      await fetchDocuments(query.trim());
+    } catch (err) {
+      setError(
+        err?.response?.data?.message || err?.message || t("UploadFailed")
+      );
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
   };
 
   return (
@@ -96,29 +196,59 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
         alignItems="center"
         justifyContent="space-between"
       >
-        <Typography variant="h5" fontWeight={700}>
-          {t("Documents")}
-        </Typography>
-        <TextField
-          size="small"
-          placeholder={t("SearchPlaceholder")}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(0);
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            minWidth: { xs: "100%", sm: 300 },
-            direction: isRtl ? "rtl" : "ltr",
-          }}
-        />
+        <Stack spacing={1} alignItems={isRtl ? "flex-end" : "flex-start"}>
+          <Typography variant="h5" fontWeight={700}>
+            {t("Documents")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {t("DocumentsSubtitle")}
+          </Typography>
+        </Stack>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems="center">
+          <TextField
+            size="small"
+            placeholder={t("SearchPlaceholder")}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              minWidth: { xs: "100%", sm: 260 },
+              direction: isRtl ? "rtl" : "ltr",
+            }}
+          />
+          <input
+            ref={uploadInputRef}
+            type="file"
+            hidden
+            onChange={handleUpload}
+          />
+          <Button
+            variant="contained"
+            startIcon={uploading ? <CircularProgress size={18} color="inherit" /> : <CloudUploadIcon />}
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={uploading}
+            sx={{ minWidth: 160 }}
+          >
+            {uploading ? t("Uploading") : t("UploadDocument")}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            {t("Refresh")}
+          </Button>
+        </Stack>
       </Stack>
 
       {/* Table */}
@@ -154,30 +284,49 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
           </TableHead>
 
           <TableBody>
-            {pageRows.map((doc) => (
-              <TableRow key={doc.name} hover>
-                <TableCell>{doc.name}</TableCell>
-                <TableCell>{doc.type.toUpperCase()}</TableCell>
-                <TableCell align="center">
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() =>
-                      onOpenDocViewer({
-                        fileUrl: doc.url,
-                        fileName: doc.name,
-                      })
-                    }
-                  >
-                    {t("View")}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {pageRows.length === 0 && (
+            {loading && documents.length === 0
+              ? Array.from({ length: rowsPerPage }).map((_, index) => (
+                  <TableRow key={`skeleton-${index}`}>
+                    <TableCell colSpan={3}>
+                      <Skeleton variant="rounded" height={40} />
+                    </TableCell>
+                  </TableRow>
+                ))
+              : pageRows.map((doc) => (
+                  <TableRow key={doc.id || doc.name} hover>
+                    <TableCell>{doc.name}</TableCell>
+                    <TableCell>{doc.type?.toUpperCase()}</TableCell>
+                    <TableCell align="center">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() =>
+                          onOpenDocViewer({
+                            fileUrl: doc.url,
+                            fileName: doc.name,
+                          })
+                        }
+                        disabled={!doc.url}
+                      >
+                        {t("View")}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+            {!loading && pageRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} align="center">
-                  {t("NoResults")}
+                  <Stack spacing={1} alignItems="center" sx={{ py: 6 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {t("NoResults")}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {t("NoResultsHint")}
+                    </Typography>
+                    <Button variant="outlined" onClick={handleRefresh}>
+                      {t("ResetFilters")}
+                    </Button>
+                  </Stack>
                 </TableCell>
               </TableRow>
             )}
@@ -210,6 +359,27 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
           {t("OpenImageProcessing")}
         </Button>
       </Stack>
+
+      <Snackbar
+        open={Boolean(error)}
+        autoHideDuration={6000}
+        onClose={() => setError("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+      >
+        <Alert onClose={() => setError("")} severity="error" variant="filled" sx={{ width: "100%" }}>
+          {error}
+        </Alert>
+      </Snackbar>
+      <Snackbar
+        open={uploadSuccess}
+        autoHideDuration={4000}
+        onClose={() => setUploadSuccess(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+      >
+        <Alert onClose={() => setUploadSuccess(false)} severity="success" variant="filled" sx={{ width: "100%" }}>
+          {t("UploadSuccess")}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
