@@ -130,4 +130,43 @@ export function setAuthToken(token, persist = false) {
   }
 }
 
+export async function getSettings(params = {}) {
+  const config = Object.keys(params || {}).length
+    ? { params }
+    : undefined;
+  const { data } = await apiClient.get("/api/settings", config);
+  return data;
+}
+
+export async function updateSettings(payload = {}) {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Settings update payload must be an object");
+  }
+
+  try {
+    const { data } = await apiClient.patch("/api/settings", payload);
+    return data;
+  } catch (error) {
+    if (error?.response?.status === 405 || error?.response?.status === 404) {
+      const { data } = await apiClient.put("/api/settings", payload);
+      return data;
+    }
+    throw error;
+  }
+}
+
+export async function getSettingsAuditLogs(params = {}) {
+  const config = Object.keys(params || {}).length
+    ? { params }
+    : undefined;
+  const { data } = await apiClient.get("/api/settings/audit", config);
+  return data;
+}
+
+export async function appendSettingsAuditLog(entry) {
+  const payload = entry && typeof entry === "object" ? entry : {};
+  const { data } = await apiClient.post("/api/settings/audit", payload);
+  return data;
+}
+
 export default apiClient;
