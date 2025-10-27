@@ -73,6 +73,69 @@ export async function uploadDocument(file, metadata = {}) {
   return data;
 }
 
+export async function ingestDocument(documentId, options = {}) {
+  if (!documentId) {
+    throw new Error("ingestDocument requires a documentId");
+  }
+
+  const { data } = await apiClient.post(
+    `/api/documents/${documentId}/ingest`,
+    options
+  );
+
+  return data;
+}
+
+export async function autoClassifyDocument(documentId, options = {}) {
+  if (!documentId) {
+    throw new Error("autoClassifyDocument requires a documentId");
+  }
+
+  const { data } = await apiClient.post(
+    `/api/documents/${documentId}/classify`,
+    options
+  );
+
+  return data;
+}
+
+export async function enrichDocumentMetadata(documentId, metadata = {}) {
+  if (!documentId) {
+    throw new Error("enrichDocumentMetadata requires a documentId");
+  }
+
+  const { data } = await apiClient.post(
+    `/api/documents/${documentId}/metadata`,
+    metadata
+  );
+
+  return data;
+}
+
+export async function getDocumentOcrLayers(documentId) {
+  if (!documentId) {
+    throw new Error("getDocumentOcrLayers requires a documentId");
+  }
+
+  const { data } = await apiClient.get(
+    `/api/documents/${documentId}/ocr`
+  );
+
+  return data;
+}
+
+export async function getDocumentAnnotations(documentId) {
+  if (!documentId) {
+    throw new Error("getDocumentAnnotations requires a documentId");
+  }
+
+  const { data } = await apiClient.get(
+    `/api/documents/${documentId}/annotations`
+  );
+
+  return data;
+}
+
 export async function queryAI(prompt, options = {}) {
   const payload = {
     prompt,
