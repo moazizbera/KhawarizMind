@@ -18,13 +18,20 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  Chip,
+  Tooltip,
+  LinearProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import PersonIcon from "@mui/icons-material/Person";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { getDocuments, uploadDocument } from "../services/api";
+import StatusChip from "../components/StatusChip";
+import { computeSlaMeta, formatDurationLabel } from "../utils/sla";
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) return -1;
@@ -45,24 +52,56 @@ function applySortFilter(rows, comparator, query) {
   const sorted = stabilized.map((el) => el[0]);
   if (!query) return sorted;
   const q = query.toLowerCase();
-  return sorted.filter(
-    (r) => r.name.toLowerCase().includes(q) || r.type.toLowerCase().includes(q)
-  );
+  return sorted.filter((r) => {
+    const status = (r.status || "").toLowerCase();
+    const assignee = (r.assignee || "").toLowerCase();
+    return (
+      r.name.toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q) ||
+      status.includes(q) ||
+      assignee.includes(q)
+    );
+  });
 }
 
+const now = Date.now();
 const FALLBACK_DOCS = [
-  { name: "Project_Plan.pdf", type: "pdf", url: "/sample.pdf" },
+  {
+    name: "Project_Plan.pdf",
+    type: "pdf",
+    url: "/sample.pdf",
+    status: "in_progress",
+    assignee: "Nina Rivera",
+    slaMinutes: 1440,
+    dueAt: new Date(now + 6 * 60 * 60 * 1000).toISOString(),
+  },
   {
     name: "Financial_Report.xlsx",
     type: "xlsx",
     url: "https://file-examples.com/storage/fe5d32/excel.xlsx",
+    status: "active",
+    assignee: "AI Bot",
+    slaMinutes: 720,
+    dueAt: new Date(now + 12 * 60 * 60 * 1000).toISOString(),
   },
   {
     name: "Company_Profile.docx",
     type: "docx",
     url: "https://file-examples.com/storage/fe5d32/doc.docx",
+    status: "completed",
+    assignee: "Fatima Al-Zahra",
+    slaMinutes: 480,
+    dueAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
   },
-  { name: "Blueprint_Scan.jpg", type: "jpg", url: "/sample-scan.jpg" },
+  {
+    name: "Blueprint_Scan.jpg",
+    type: "jpg",
+    url: "/sample-scan.jpg",
+    status: "overdue",
+    assignee: "Quality Desk",
+    slaMinutes: 360,
+    dueAt: new Date(now - 4 * 60 * 60 * 1000).toISOString(),
+  },
 ];
 
 export default function Documents({ onOpenDocViewer, onOpenImage }) {
@@ -82,6 +121,53 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const uploadInputRef = useRef(null);
+
+  const getSlaDetails = useCallback(
+    (item) => {
+      const meta = computeSlaMeta(item?.dueAt, item?.slaMinutes);
+      if (meta.state === "none") {
+        return { meta, label: t("SlaNotDefined"), color: "default" };
+      }
+
+      if (meta.state === "overdue") {
+        return {
+          meta,
+          color: "error",
+          label: t("SlaOverdue", { time: formatDurationLabel(meta.remainingMs, t) }),
+        };
+      }
+
+      if (meta.state === "warning") {
+        return {
+          meta,
+          color: "warning",
+          label: t("SlaDueSoon", { time: formatDurationLabel(meta.remainingMs, t) }),
+        };
+      }
+
+      return {
+        meta,
+        color: "success",
+        label: t("SlaOnTrack", { time: formatDurationLabel(meta.remainingMs, t) }),
+      };
+    },
+    [t]
+  );
+
+  const formatDueDate = useCallback(
+    (value) => {
+      if (!value) return t("SlaNoDueDate");
+      const date = new Date(value);
+      return new Intl.DateTimeFormat(lang === "ar" ? "ar" : "en", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
+    },
+    [lang, t]
+  );
 
   const fetchDocuments = useCallback(
     async (search = "") => {
@@ -103,6 +189,10 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
           url: doc.url || doc.downloadUrl || doc.previewUrl || "",
           id: doc.id,
           createdAt: doc.createdAt,
+          status: doc.status || doc.state || "draft",
+          assignee: doc.assignee || doc.owner || doc.assignedTo || "",
+          slaMinutes: doc.slaMinutes ?? doc.sla?.minutes ?? null,
+          dueAt: doc.dueAt || doc.sla?.dueAt || doc.deadline || null,
         }));
 
         setDocuments(mapped);
@@ -277,6 +367,9 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
                   {t("Type")}
                 </TableSortLabel>
               </TableCell>
+              <TableCell width={180}>{t("AssignedTo")}</TableCell>
+              <TableCell width={140}>{t("Status")}</TableCell>
+              <TableCell width={220}>{t("SLA")}</TableCell>
               <TableCell align="center" width={140}>
                 {t("Action")}
               </TableCell>
@@ -287,35 +380,84 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
             {loading && documents.length === 0
               ? Array.from({ length: rowsPerPage }).map((_, index) => (
                   <TableRow key={`skeleton-${index}`}>
-                    <TableCell colSpan={3}>
+                    <TableCell colSpan={6}>
                       <Skeleton variant="rounded" height={40} />
                     </TableCell>
                   </TableRow>
                 ))
-              : pageRows.map((doc) => (
-                  <TableRow key={doc.id || doc.name} hover>
-                    <TableCell>{doc.name}</TableCell>
-                    <TableCell>{doc.type?.toUpperCase()}</TableCell>
-                    <TableCell align="center">
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={() =>
-                          onOpenDocViewer({
-                            fileUrl: doc.url,
-                            fileName: doc.name,
-                          })
-                        }
-                        disabled={!doc.url}
-                      >
-                        {t("View")}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+              : pageRows.map((doc) => {
+                  const sla = getSlaDetails(doc);
+                  const chipColor = sla.color === "default" ? undefined : sla.color;
+                  return (
+                    <TableRow key={doc.id || doc.name} hover>
+                      <TableCell>{doc.name}</TableCell>
+                      <TableCell>{doc.type?.toUpperCase()}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          icon={<PersonIcon fontSize="inherit" />}
+                          label={doc.assignee || t("Unassigned")}
+                          variant={doc.assignee ? "filled" : "outlined"}
+                          color={doc.assignee ? "info" : undefined}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <StatusChip status={doc.status} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Stack spacing={1} alignItems={isRtl ? "flex-end" : "flex-start"}>
+                          <Tooltip title={formatDueDate(doc.dueAt)}>
+                            <Chip
+                              size="small"
+                              icon={<AccessTimeIcon fontSize="inherit" />}
+                              label={sla.label}
+                              color={chipColor}
+                              variant={sla.color === "default" ? "outlined" : "filled"}
+                            />
+                          </Tooltip>
+                          {sla.meta.state !== "none" && (
+                            <LinearProgress
+                              variant="determinate"
+                              value={sla.meta.progress}
+                              sx={(theme) => ({
+                                width: 160,
+                                height: 6,
+                                borderRadius: 999,
+                                backgroundColor: theme.palette.grey[200],
+                                "& .MuiLinearProgress-bar": {
+                                  backgroundColor:
+                                    sla.color === "error"
+                                      ? theme.palette.error.main
+                                      : sla.color === "warning"
+                                      ? theme.palette.warning.main
+                                      : theme.palette.success.main,
+                                },
+                              })}
+                            />
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() =>
+                            onOpenDocViewer({
+                              fileUrl: doc.url,
+                              fileName: doc.name,
+                            })
+                          }
+                          disabled={!doc.url}
+                        >
+                          {t("View")}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
             {!loading && pageRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} align="center">
+                <TableCell colSpan={6} align="center">
                   <Stack spacing={1} alignItems="center" sx={{ py: 6 }}>
                     <Typography variant="subtitle1" fontWeight={600}>
                       {t("NoResults")}

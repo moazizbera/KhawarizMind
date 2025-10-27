@@ -73,6 +73,26 @@ export async function uploadDocument(file, metadata = {}) {
   return data;
 }
 
+export async function getWorkflows(params = {}) {
+  const { data } = await apiClient.get("/api/workflows", { params });
+  return data;
+}
+
+export async function getWorkflowById(id) {
+  const { data } = await apiClient.get(`/api/workflows/${id}`);
+  return data;
+}
+
+export async function saveWorkflow(payload) {
+  if (payload?.id) {
+    const { id, ...body } = payload;
+    const { data } = await apiClient.put(`/api/workflows/${id}`, body);
+    return data;
+  }
+  const { data } = await apiClient.post("/api/workflows", payload);
+  return data;
+}
+
 export async function queryAI(prompt, options = {}) {
   const payload = {
     prompt,
