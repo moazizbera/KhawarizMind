@@ -1,21 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Box,
-  Button,
-  Chip,
-  CircularProgress,
-  Divider,
   Drawer,
   IconButton,
-  Menu,
-  MenuItem,
-  Paper,
-  Snackbar,
-  Stack,
-  TextField,
-  Tooltip,
   Typography,
+  Divider,
+  TextField,
+  Button,
+  Stack,
+  Paper,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import SummarizeOutlinedIcon from "@mui/icons-material/SummarizeOutlined";
@@ -25,12 +21,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import IosShareIcon from "@mui/icons-material/IosShare";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
-import {
-  API_BASE_URL,
-  fetchAiActions,
-  getStoredAuthToken,
-  summarizeAI,
-} from "../services/api";
+import { queryAI } from "../services/api";
 
 function Bubble({ role, text, variant, caption }) {
   const isUser = role === "user";
@@ -219,11 +210,7 @@ export default function AIAssistantPanel({
     buildMessage("assistant", t("AIPanelWelcome"), { isWelcome: true }),
   ]);
   const [loading, setLoading] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [actionsLoading, setActionsLoading] = useState(false);
-  const [followUps, setFollowUps] = useState([]);
-  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [error, setError] = useState("");
   const listRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -238,26 +225,42 @@ export default function AIAssistantPanel({
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    // update welcome message on language change
+    setMsgs([{ role: "assistant", text: t("AIPanelWelcome") }]);
+  }, [t]);
+
+  const send = async () => {
+    if (!input.trim()) return;
+    const prompt = input.trim();
+    const userMsg = { role: "user", text: prompt };
+    setMsgs((m) => [...m, userMsg]);
+    setInput("");
+    setLoading(true);
     try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length) {
-          setMsgs(
-            parsed.map((item) => ({
-              ...item,
-              id: item.id || `${item.role}-${item.createdAt || Date.now()}`,
-            }))
-          );
-          return;
-        }
-      }
-    } catch (error) {
-      console.warn("Failed to load AI history", error);
+      const response = await queryAI(prompt);
+      const assistantText =
+        response?.answer ||
+        response?.data ||
+        response?.message ||
+        t("AIStubResponse");
+      setMsgs((m) => [...m, { role: "assistant", text: assistantText }]);
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        t("AIError");
+      setError(message);
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "assistant",
+          text: t("AIErrorMessage"),
+        },
+      ]);
+    } finally {
+      setLoading(false);
     }
-    setMsgs([welcomeMessage]);
-  }, [storageKey, welcomeMessage]);
+  };
 
   useEffect(() => {
     setMsgs((prev) =>
@@ -686,167 +689,57 @@ export default function AIAssistantPanel({
           textAlign: isRtl ? "right" : "left",
         }}
       >
-        {t("AIFollowUpTitle", {
-          defaultValue: "Suggested follow-up questions",
-        })}
-      </Typography>
-      <Stack
-        direction="row"
-        flexWrap="wrap"
-        gap={1}
-        sx={{ flexDirection: isRtl ? "row-reverse" : "row" }}
-      >
-        {followUps.map((suggestion, index) => (
-          <Chip
-            key={`${suggestion}-${index}`}
-            label={suggestion}
-            variant="outlined"
-            onClick={() => handleFollowUpClick(suggestion)}
-            sx={{ cursor: "pointer" }}
-          />
+        {msgs.map((m, i) => (
+          <Bubble key={`${m.role}-${i}`} role={m.role} text={m.text} />
         ))}
-        {actionsLoading && <CircularProgress size={18} />}
-      </Stack>
-    </Box>
-  );
-
-  const conversationList = (
-    <Box
-      ref={listRef}
-      sx={{
-        p: 2,
-        overflowY: "auto",
-        flexGrow: 1,
-        display: "flex",
-        flexDirection: "column",
-        gap: 1,
-      }}
-    >
-      {msgs.map((m) => (
-        <Bubble
-          key={m.id}
-          role={m.role}
-          text={m.text}
-          variant={m.variant}
-          caption={m.caption}
-        />
-      ))}
-      {loading && (
-        <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              px: 2,
-              py: 1,
-              maxWidth: "80%",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              borderRadius: 2,
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <CircularProgress size={16} />
-            <Typography variant="body2">{t("AIThinking")}</Typography>
-          </Paper>
+        {loading && (
+          <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                px: 2,
+                py: 1,
+                maxWidth: "80%",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <CircularProgress size={16} />
+              <Typography variant="body2">{t("AIThinking")}</Typography>
+            </Paper>
+          </Stack>
+        )}
+      </Box>
+      <Divider />
+      <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
+        <Stack direction="row" spacing={1}>
+          <TextField
+            placeholder={t("AIInputPlaceholder")}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            fullWidth
+            size="small"
+            onKeyDown={(e) => e.key === "Enter" && !loading && send()}
+          />
+          <Button variant="contained" onClick={send} disabled={loading}>
+            {loading ? <CircularProgress size={18} color="inherit" /> : t("Send")}
+          </Button>
         </Stack>
-      )}
-      {followUps.length > 0 || actionsLoading ? followUpSection : null}
-    </Box>
-  );
-
-  const inputSection = (
-    <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
-      <Stack direction="row" spacing={1}>
-        <TextField
-          placeholder={t("AIInputPlaceholder")}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          fullWidth
-          size="small"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-          multiline
-          minRows={1}
-          maxRows={4}
-        />
-        <Button
-          variant="contained"
-          onClick={() => handleSend()}
-          disabled={loading || !input.trim()}
-          sx={{ minWidth: 90 }}
-        >
-          {loading ? (
-            <CircularProgress size={18} color="inherit" />
-          ) : (
-            t("Send")
-          )}
-        </Button>
-      </Stack>
-    </Box>
-  );
-
-  const content = (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-      dir={isRtl ? "rtl" : "ltr"}
-    >
-      {header}
-      <Divider />
-      {conversationList}
-      <Divider />
-      {inputSection}
-    </Box>
-  );
-
-  return (
-    <>
-      {typeof open === "boolean" ? (
-        <Drawer
-          anchor={isRtl ? "left" : "right"}
-          open={open}
-          onClose={onClose}
-          PaperProps={{ sx: { width: { xs: "100%", sm: 420 } } }}
-        >
-          {content}
-        </Drawer>
-      ) : (
-        <Paper
-          elevation={1}
-          sx={{ height: "100%", display: "flex", flexDirection: "column" }}
-        >
-          {content}
-        </Paper>
-      )}
+      </Box>
       <Snackbar
-        open={Boolean(toast)}
+        open={Boolean(error)}
         autoHideDuration={6000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: isRtl ? "left" : "right",
-        }}
+        onClose={() => setError("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
       >
-        {toast ? (
-          <Alert
-            onClose={() => setToast(null)}
-            severity={toast.severity || "info"}
-            variant="filled"
-            sx={{ width: "100%" }}
-          >
-            {toast.message}
-          </Alert>
-        ) : null}
+        <Alert onClose={() => setError("")} severity="error" variant="filled" sx={{ width: "100%" }}>
+          {error}
+        </Alert>
       </Snackbar>
-    </>
+    </Drawer>
   );
 }

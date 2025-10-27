@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export const API_BASE_URL =
+const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
   (typeof window !== "undefined"
     ? window.__KM_API_BASE_URL__
@@ -73,26 +73,6 @@ export async function uploadDocument(file, metadata = {}) {
   return data;
 }
 
-export async function getWorkflows(params = {}) {
-  const { data } = await apiClient.get("/api/workflows", { params });
-  return data;
-}
-
-export async function getWorkflowById(id) {
-  const { data } = await apiClient.get(`/api/workflows/${id}`);
-  return data;
-}
-
-export async function saveWorkflow(payload) {
-  if (payload?.id) {
-    const { id, ...body } = payload;
-    const { data } = await apiClient.put(`/api/workflows/${id}`, body);
-    return data;
-  }
-  const { data } = await apiClient.post("/api/workflows", payload);
-  return data;
-}
-
 export async function queryAI(prompt, options = {}) {
   const payload = {
     prompt,
@@ -102,25 +82,6 @@ export async function queryAI(prompt, options = {}) {
   return data;
 }
 
-export async function summarizeAI(options = {}) {
-  const { data } = await apiClient.post("/api/ai/summarize", options);
-  return data;
-}
-
-export async function fetchAiActions(options = {}) {
-  const { data } = await apiClient.post("/api/ai/actions", options);
-  return data;
-}
-
-export function getStoredAuthToken() {
-  if (typeof window === "undefined") return null;
-  return (
-    window.sessionStorage.getItem("km-token") ||
-    window.localStorage.getItem("km-token") ||
-    null
-  );
-}
-
 export function setAuthToken(token, persist = false) {
   if (typeof window === "undefined") return;
   const storage = persist ? window.localStorage : window.sessionStorage;
@@ -128,45 +89,6 @@ export function setAuthToken(token, persist = false) {
   if (!persist) {
     window.localStorage.removeItem("km-token");
   }
-}
-
-export async function getSettings(params = {}) {
-  const config = Object.keys(params || {}).length
-    ? { params }
-    : undefined;
-  const { data } = await apiClient.get("/api/settings", config);
-  return data;
-}
-
-export async function updateSettings(payload = {}) {
-  if (!payload || typeof payload !== "object") {
-    throw new Error("Settings update payload must be an object");
-  }
-
-  try {
-    const { data } = await apiClient.patch("/api/settings", payload);
-    return data;
-  } catch (error) {
-    if (error?.response?.status === 405 || error?.response?.status === 404) {
-      const { data } = await apiClient.put("/api/settings", payload);
-      return data;
-    }
-    throw error;
-  }
-}
-
-export async function getSettingsAuditLogs(params = {}) {
-  const config = Object.keys(params || {}).length
-    ? { params }
-    : undefined;
-  const { data } = await apiClient.get("/api/settings/audit", config);
-  return data;
-}
-
-export async function appendSettingsAuditLog(entry) {
-  const payload = entry && typeof entry === "object" ? entry : {};
-  const { data } = await apiClient.post("/api/settings/audit", payload);
-  return data;
 }
 
 export default apiClient;

@@ -58,20 +58,8 @@ export default function DashboardShell({ username }) {
     fileUrl: "",
     fileName: "",
     maximized: false,
-    ocrLayers: [],
-    annotations: [],
-    tooltipLocales: {},
-    languages: [],
-    classification: "",
-    metadata: {},
   });
-  const [imageViewerState, setImageViewerState] = useState({
-    open: false,
-    imageSrc: "/sample-scan.jpg",
-    ocrData: [],
-    annotations: [],
-    tooltipLocales: {},
-  });
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
   const storedUsername = useMemo(() => {
     if (typeof window === "undefined") return username || "";
@@ -82,48 +70,20 @@ export default function DashboardShell({ username }) {
 
   const handleDrawerToggle = () => setMobileOpen((prev) => !prev);
 
-  const handleOpenDocViewer = (doc) => {
-    if (!doc) return;
-    setViewerState({
-      open: true,
-      fileUrl: doc.url || doc.fileUrl || "",
-      fileName: doc.name || doc.fileName || "",
-      maximized: false,
-      ocrLayers: doc.ocrLayers || [],
-      annotations: doc.annotations || [],
-      tooltipLocales: doc.tooltipLocales || {},
-      languages: doc.languages || [],
-      classification: doc.classification || "",
-      metadata: doc.metadata || {},
-    });
+  const handleOpenDocViewer = ({ fileUrl, fileName }) => {
+    setViewerState({ open: true, fileUrl, fileName, maximized: false });
   };
 
   const handleCloseDocViewer = () => {
-    setViewerState((prev) => ({
-      ...prev,
-      open: false,
-      fileUrl: "",
-      fileName: "",
-      maximized: false,
-    }));
+    setViewerState((prev) => ({ ...prev, open: false, fileUrl: "", fileName: "", maximized: false }));
   };
 
   const handleToggleMaximize = () => {
     setViewerState((prev) => ({ ...prev, maximized: !prev.maximized }));
   };
 
-  const handleOpenImage = (payload = {}) => {
-    setImageViewerState({
-      open: true,
-      imageSrc: payload.imageSrc || "/sample-scan.jpg",
-      ocrData: payload.ocrData || [],
-      annotations: payload.annotations || [],
-      tooltipLocales: payload.tooltipLocales || {},
-    });
-  };
-  const handleCloseImage = () => {
-    setImageViewerState((prev) => ({ ...prev, open: false }));
-  };
+  const handleOpenImage = () => setImageDialogOpen(true);
+  const handleCloseImage = () => setImageDialogOpen(false);
 
   const handleNav = (item) => {
     if (item.isAi) {
@@ -349,12 +309,6 @@ export default function DashboardShell({ username }) {
             <UnifiedDocumentViewer
               fileUrl={viewerState.fileUrl}
               fileName={viewerState.fileName}
-              ocrLayers={viewerState.ocrLayers}
-              annotations={viewerState.annotations}
-              tooltipLocales={viewerState.tooltipLocales}
-              languages={viewerState.languages}
-              classification={viewerState.classification}
-              metadata={viewerState.metadata}
             />
           )}
         </DialogContent>
@@ -362,7 +316,7 @@ export default function DashboardShell({ username }) {
 
       {/* Image Processing Dialog */}
       <Dialog
-        open={imageViewerState.open}
+        open={imageDialogOpen}
         onClose={handleCloseImage}
         fullScreen={isSmallScreen}
         maxWidth="lg"
@@ -384,14 +338,7 @@ export default function DashboardShell({ username }) {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
-          {imageViewerState.open && (
-            <ImageProcessingViewer
-              imageSrc={imageViewerState.imageSrc}
-              ocrData={imageViewerState.ocrData}
-              annotations={imageViewerState.annotations}
-              tooltipLocales={imageViewerState.tooltipLocales}
-            />
-          )}
+          {imageDialogOpen && <ImageProcessingViewer />}
         </DialogContent>
       </Dialog>
     </Box>
