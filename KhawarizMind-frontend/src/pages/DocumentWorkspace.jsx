@@ -4,6 +4,10 @@ import DocumentViewer from "../components/DocumentViewer";
 import AIAssistantPanel from "../components/AIAssistantPanel";
 
 export default function DocumentWorkspace() {
+  const documentId = "sample-invoice";
+  const documentTitle = "Sample_Invoice.pdf";
+  const documentLanguage = "en";
+
   return (
     <Box sx={{ flexGrow: 1, p: 2 }}>
       <Grid container spacing={2}>
@@ -11,7 +15,11 @@ export default function DocumentWorkspace() {
           <DocumentViewer fileType="pdf" fileName="Sample_Invoice.pdf" />
         </Grid>
         <Grid item xs={12} md={4}>
-          <AIAssistantPanel />
+          <AIAssistantPanel
+            contextId={documentId}
+            contextLabel={documentTitle}
+            documentLanguage={documentLanguage}
+          />
         </Grid>
       </Grid>
     </Box>
