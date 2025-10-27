@@ -5,19 +5,14 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Chip,
   Tooltip,
   LinearProgress,
   Grid,
   InputAdornment,
-  LinearProgress,
   Paper,
   Snackbar,
   Stack,
-  Skeleton,
-  Snackbar,
-  Alert,
-  CircularProgress,
+  Skeleton
 } from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -26,8 +21,6 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PersonIcon from "@mui/icons-material/Person";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import apiClient, { getDocuments, uploadDocument } from "../services/api";
 
 function descendingComparator(a, b, orderBy) {
@@ -376,7 +369,7 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
             </Stack>
           </Box>
         )}
-
+<TableContainer component={Paper}>
         <Paper variant="outlined" sx={{ height: 520, position: "relative" }}>
           <DataGrid
             rows={documents}
@@ -466,7 +459,8 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
                 alignItems={isRtl ? "flex-end" : "flex-start"}
                 direction={isRtl ? "row-reverse" : "row"}
                 justifyContent={isRtl ? "flex-start" : "flex-end"}
-              >
+                            >
+              <TableSortLabel>
                 <Button
                   variant="outlined"
                   onClick={() => handleOpenImage(selectedDocForImage)}
@@ -474,7 +468,13 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
                   disabled={!documents.length}
                 >
                   {t("Type")}
-                </TableSortLabel>
+                </Button>
+              </TableSortLabel>
+              <TableCell width={180}>{t("AssignedTo")}</TableCell>
+              <TableCell width={140}>{t("Status")}</TableCell>
+              <TableCell width={220}>{t("SLA")}</TableCell>
+              <TableCell align="center" width={140}>
+                {t("Action")}
               </TableCell>
               <TableCell width={180}>{t("AssignedTo")}</TableCell>
               <TableCell width={140}>{t("Status")}</TableCell>
@@ -482,9 +482,8 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
               <TableCell align="center" width={140}>
                 {t("Action")}
               </TableCell>
-            </TableRow>
-          </TableHead>
-
+        </Stack>
+        </Grid> 
           <TableBody>
             {loading && documents.length === 0
               ? Array.from({ length: rowsPerPage }).map((_, index) => (
@@ -535,7 +534,8 @@ export default function Documents({ onOpenDocViewer, onOpenImage }) {
               </TableRow>
             )}
           </TableBody>
-        </Table>
+        </Grid>
+        </Paper>
       </TableContainer>
 
       {/* Pagination */}
