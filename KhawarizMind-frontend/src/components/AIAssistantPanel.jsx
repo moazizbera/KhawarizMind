@@ -678,68 +678,68 @@ export default function AIAssistantPanel({
     </Box>
   );
 
-  const followUpSection = (
-    <Box sx={{ mt: 1 }}>
-      <Typography
-        variant="caption"
-        sx={{
-          display: "block",
-          mb: 0.5,
-          color: "text.secondary",
-          textAlign: isRtl ? "right" : "left",
-        }}
-      >
-        {msgs.map((m, i) => (
-          <Bubble key={`${m.role}-${i}`} role={m.role} text={m.text} />
-        ))}
-        {loading && (
-          <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
-            <Paper
-              elevation={0}
-              sx={{
-                px: 2,
-                py: 1,
-                maxWidth: "80%",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <CircularProgress size={16} />
-              <Typography variant="body2">{t("AIThinking")}</Typography>
-            </Paper>
-          </Stack>
-        )}
-      </Box>
-      <Divider />
-      <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
-        <Stack direction="row" spacing={1}>
-          <TextField
-            placeholder={t("AIInputPlaceholder")}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            fullWidth
-            size="small"
-            onKeyDown={(e) => e.key === "Enter" && !loading && send()}
-          />
-          <Button variant="contained" onClick={send} disabled={loading}>
-            {loading ? <CircularProgress size={18} color="inherit" /> : t("Send")}
-          </Button>
+ const followUpSection = (
+  <Box sx={{ mt: 1 }}>
+    <Typography
+      variant="caption"
+      sx={{
+        display: "block",
+        mb: 0.5,
+        color: "text.secondary",
+        textAlign: isRtl ? "right" : "left",
+      }}
+    >
+      {msgs.map((m, i) => (
+        <Bubble key={`${m.role}-${i}`} role={m.role} text={m.text} />
+      ))}
+      {loading && (
+        <Stack direction="row" justifyContent="flex-start" sx={{ mb: 1 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              px: 2,
+              py: 1,
+              maxWidth: "80%",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <CircularProgress size={16} />
+            <Typography variant="body2">{t("AIThinking")}</Typography>
+          </Paper>
         </Stack>
-      </Box>
-      <Snackbar
-        open={Boolean(error)}
-        autoHideDuration={6000}
-        onClose={() => setError("")}
-        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
-      >
-        <Alert onClose={() => setError("")} severity="error" variant="filled" sx={{ width: "100%" }}>
-          {error}
-        </Alert>
-      </Snackbar>
-    </Drawer>
-  );
+      )}
+    </Typography>
+    <Divider />
+    <Box sx={{ p: 2 }} dir={isRtl ? "rtl" : "ltr"}>
+      <Stack direction="row" spacing={1}>
+        <TextField
+          placeholder={t("AIInputPlaceholder")}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          fullWidth
+          size="small"
+          onKeyDown={(e) => e.key === "Enter" && !loading && send()}
+        />
+        <Button variant="contained" onClick={send} disabled={loading}>
+          {loading ? <CircularProgress size={18} color="inherit" /> : t("Send")}
+        </Button>
+      </Stack>
+    </Box>
+    <Snackbar
+      open={Boolean(error)}
+      autoHideDuration={6000}
+      onClose={() => setError("")}
+      anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+    >
+      <Alert onClose={() => setError("")} severity="error" variant="filled" sx={{ width: "100%" }}>
+        {error}
+      </Alert>
+    </Snackbar>
+  </Box>
+);
 }
