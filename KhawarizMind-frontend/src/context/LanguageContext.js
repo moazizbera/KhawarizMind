@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { getSettings, updateSettings } from "../services/api";
+import { useSettings } from "./SettingsContext";
 
 const LanguageContext = createContext();
 
@@ -20,6 +20,14 @@ export function LanguageProvider({ children }) {
     return window.localStorage.getItem("lang") || DEFAULT_LANGUAGE;
   };
 
+  const {
+    settings,
+    saveSettings,
+    isHydrated: settingsHydrated,
+    error: settingsError,
+  } = useSettings();
+  const settingsLanguage = settings?.language;
+
   const [lang, setLangState] = useState(getInitialLanguage);
   const [hydrated, setHydrated] = useState(false);
   const langRef = useRef(lang);
@@ -32,34 +40,15 @@ export function LanguageProvider({ children }) {
   }, [lang]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function syncWithServer() {
-      try {
-        const data = await getSettings();
-        if (cancelled) return;
-
-        const serverLanguage =
-          data?.preferences?.language || data?.language || null;
-
-        if (serverLanguage && serverLanguage !== langRef.current) {
-          setLangState(serverLanguage);
-        }
-      } catch (error) {
-        console.warn("Failed to hydrate language from settings", error);
-      } finally {
-        if (!cancelled) {
-          setHydrated(true);
-        }
-      }
+    if (!settingsHydrated) {
+      return;
     }
 
-    syncWithServer();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!settingsError && settingsLanguage && settingsLanguage !== langRef.current) {
+      setLangState(settingsLanguage);
+    }
+    setHydrated(true);
+  }, [settingsHydrated, settingsLanguage, settingsError]);
 
   const persistLanguage = useCallback(async (nextLanguage, options = {}) => {
     const { persistToServer = true } = options;
@@ -73,15 +62,18 @@ export function LanguageProvider({ children }) {
     }
 
     try {
-      await updateSettings({ language: nextLanguage });
+      await saveSettings({ language: nextLanguage });
       return nextLanguage;
     } catch (error) {
       console.error("Failed to update language preference", error);
       setLangState(previous);
       langRef.current = previous;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("lang", previous);
+      }
       throw error;
     }
-  }, []);
+  }, [saveSettings]);
 
   const toggleLanguage = useCallback(() => {
     const next = langRef.current === "en" ? "ar" : "en";
