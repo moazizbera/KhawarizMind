@@ -1,0 +1,15 @@
+# Build outputs
+bin/
+obj/
+
+# User secrets and local data
+*.db
+Data/
+KhawarizMind-backend/**/Data/
+
+# Node modules
+node_modules/
+
+# VS Code and Rider
+.vscode/
+.idea/

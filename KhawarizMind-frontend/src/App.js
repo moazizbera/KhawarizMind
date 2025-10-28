@@ -14,6 +14,8 @@ import {
   Box,
   createTheme,
   Tooltip,
+  Alert,
+  Snackbar,
 } from "@mui/material";
 
 import { AnimatePresence } from "framer-motion";
@@ -25,6 +27,7 @@ import TranslateIcon from "@mui/icons-material/Translate";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 
+import { SettingsProvider } from "./context/SettingsContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { ThemeModeProvider, useThemeMode } from "./context/ThemeContext";
 
@@ -36,8 +39,10 @@ const createEmotionCache = (isRtl) =>
   });
 
 function AppContent() {
-  const { lang, toggleLanguage } = useLanguage();
-  const { mode, toggleTheme } = useThemeMode();
+  const { lang, toggleLanguage, loading: languageLoading, error: languageError } =
+    useLanguage();
+  const { mode, toggleTheme, loading: themeLoading, error: themeError } =
+    useThemeMode();
   const { t, i18n } = useTranslation();
 
   const isRtl = lang === "ar";
@@ -77,6 +82,9 @@ function AppContent() {
 
   const cache = useMemo(() => createEmotionCache(isRtl), [isRtl]);
 
+  const hasToggleError = Boolean(languageError || themeError);
+  const toggleErrorMessage = languageError || themeError || "";
+
   return (
     <CacheProvider value={cache}>
       <ThemeProvider theme={theme}>
@@ -95,34 +103,42 @@ function AppContent() {
           >
             <Tooltip
               title={
-                mode === "dark"
+                themeLoading
+                  ? t("Loading")
+                  : mode === "dark"
                   ? t("SwitchToLight")
                   : t("SwitchToDark")
               }
             >
-              <IconButton
-                onClick={toggleTheme}
-                sx={{
-                  bgcolor: "primary.main",
-                  color: "#fff",
-                  "&:hover": { bgcolor: "primary.dark" },
-                }}
-              >
-                {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
+              <span>
+                <IconButton
+                  onClick={toggleTheme}
+                  disabled={themeLoading || Boolean(themeError)}
+                  sx={{
+                    bgcolor: "primary.main",
+                    color: "#fff",
+                    "&:hover": { bgcolor: "primary.dark" },
+                  }}
+                >
+                  {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+                </IconButton>
+              </span>
             </Tooltip>
 
-            <Tooltip title={t("ToggleLanguage")}>
-              <IconButton
-                onClick={toggleLanguage}
-                sx={{
-                  bgcolor: "primary.main",
-                  color: "#fff",
-                  "&:hover": { bgcolor: "primary.dark" },
-                }}
-              >
-                <TranslateIcon />
-              </IconButton>
+            <Tooltip title={languageLoading ? t("Loading") : t("ToggleLanguage")}>
+              <span>
+                <IconButton
+                  onClick={toggleLanguage}
+                  disabled={languageLoading || Boolean(languageError)}
+                  sx={{
+                    bgcolor: "primary.main",
+                    color: "#fff",
+                    "&:hover": { bgcolor: "primary.dark" },
+                  }}
+                >
+                  <TranslateIcon />
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
 
@@ -134,6 +150,15 @@ function AppContent() {
             </Routes>
           </AnimatePresence>
         </Router>
+        <Snackbar
+          open={hasToggleError}
+          autoHideDuration={6000}
+          anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+        >
+          <Alert severity="error" variant="filled" sx={{ width: "100%" }}>
+            {toggleErrorMessage}
+          </Alert>
+        </Snackbar>
       </ThemeProvider>
     </CacheProvider>
   );
@@ -141,10 +166,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <ThemeModeProvider>
-        <AppContent />
-      </ThemeModeProvider>
-    </LanguageProvider>
+    <SettingsProvider>
+      <LanguageProvider>
+        <ThemeModeProvider>
+          <AppContent />
+        </ThemeModeProvider>
+      </LanguageProvider>
+    </SettingsProvider>
   );
 }
