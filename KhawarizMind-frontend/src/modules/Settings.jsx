@@ -182,7 +182,10 @@ export default function Settings() {
   }));
 
   return (
-    <Paper sx={{ p: 3 }} dir={isRtl ? "rtl" : "ltr"}>
+    <Paper
+      sx={{ p: 3, textAlign: isRtl ? "right" : "left" }}
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>
         {t("Settings")}
       </Typography>
