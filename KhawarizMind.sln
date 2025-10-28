@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "TenantManagementService", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentManagementSystem.TenantManagementService", "KhawarizMind-backend\TenantManagementService\DocumentManagementSystem.TenantManagementService.csproj", "{2122ED00-C4C6-49C8-B8E2-676C92768951}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TenantManagementService.Tests", "KhawarizMind-backend\TenantManagementService.Tests\TenantManagementService.Tests.csproj", "{53B15CE6-488C-4F24-B29F-07266C441196}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DocumentService", "DocumentService", "{89214FB0-DD8B-A6D5-9D67-E8B3D341947F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DocumentManagementSystem.DocumentService", "KhawarizMind-backend\DocumentService\DocumentManagementSystem.DocumentService.csproj", "{58374C78-39D9-444B-B2C6-9397C9A9AFDA}"
@@ -207,7 +209,19 @@ Global
 		{A8ED9EED-80CE-4BD7-9EF7-1062025B061E}.Release|x64.Build.0 = Release|Any CPU
 		{A8ED9EED-80CE-4BD7-9EF7-1062025B061E}.Release|x86.ActiveCfg = Release|Any CPU
 		{A8ED9EED-80CE-4BD7-9EF7-1062025B061E}.Release|x86.Build.0 = Release|Any CPU
-	EndGlobalSection
+	                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|Any CPU.Build.0 = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|x64.ActiveCfg = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|x64.Build.0 = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|x86.ActiveCfg = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Debug|x86.Build.0 = Debug|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|Any CPU.ActiveCfg = Release|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|Any CPU.Build.0 = Release|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|x64.ActiveCfg = Release|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|x64.Build.0 = Release|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|x86.ActiveCfg = Release|Any CPU
+                {53B15CE6-488C-4F24-B29F-07266C441196}.Release|x86.Build.0 = Release|Any CPU
+EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
@@ -216,6 +230,7 @@ Global
 		{8C4AC69B-676A-4164-83DA-7794B40C57CB} = {F5FBE395-A9AA-0EC5-3054-FC66B787845B}
 		{4DA32692-5C5B-D8D0-38CE-D06CCC4D3D52} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
 		{2122ED00-C4C6-49C8-B8E2-676C92768951} = {4DA32692-5C5B-D8D0-38CE-D06CCC4D3D52}
+{53B15CE6-488C-4F24-B29F-07266C441196} = {4DA32692-5C5B-D8D0-38CE-D06CCC4D3D52}
 		{89214FB0-DD8B-A6D5-9D67-E8B3D341947F} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
 		{58374C78-39D9-444B-B2C6-9397C9A9AFDA} = {89214FB0-DD8B-A6D5-9D67-E8B3D341947F}
 		{7638FB26-5D04-F889-149F-E3858C0305B1} = {1AE8ACA6-933B-BF2A-3671-3E2EAC007D16}
