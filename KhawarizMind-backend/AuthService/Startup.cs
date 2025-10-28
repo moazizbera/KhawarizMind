@@ -1,24 +1,17 @@
-using DocumentManagementSystem.Common.Authentication;
-using DocumentManagementSystem.Common.Data;
+using DocumentManagementSystem.AuthService.Models;
+using DocumentManagementSystem.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddCommonJwtAuthentication();
+builder.Services.AddSharedSqliteDbContext<AppDbContext>(builder.Configuration);
+builder.Services.AddAuthentication("Bearer").AddJwtBearer();
 
 var app = builder.Build();
 
-InMemoryStore.EnsureSeeded();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
