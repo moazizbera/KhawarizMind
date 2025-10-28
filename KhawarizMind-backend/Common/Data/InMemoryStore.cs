@@ -4,6 +4,7 @@ using DocumentManagementSystem.Common.Models.Audit;
 using DocumentManagementSystem.Common.Models.Auth;
 using DocumentManagementSystem.Common.Models.Documents;
 using DocumentManagementSystem.Common.Models.Settings;
+using TenantSettingsModel = DocumentManagementSystem.Common.Models.Settings.TenantSettings;
 using DocumentManagementSystem.Common.Models.Workflows;
 
 namespace DocumentManagementSystem.Common.Data;
@@ -71,7 +72,7 @@ public static class InMemoryStore
 
     private static void SeedSettings()
     {
-        TenantSettings[DefaultTenantId] = TenantSettings.CreateDefault();
+        TenantSettings[DefaultTenantId] = TenantSettingsModel.CreateDefault();
         AuditLogs[DefaultTenantId] = new List<AuditLogEntry>
         {
             new()
