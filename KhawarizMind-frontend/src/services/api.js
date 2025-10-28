@@ -368,6 +368,43 @@ export async function queryAI(prompt, options = {}) {
   return { ...normalized, meta };
 }
 
+export async function fetchAiActions(options = {}) {
+  const response = await apiClient.post("/api/ai/actions", options);
+  const { payload: result, meta } = unwrapEnvelope(response.data);
+  const payload = Array.isArray(result)
+    ? { followUps: result }
+    : ensureObject(result);
+  const normalized = normalizeAiResponse(payload);
+  const actions = normalized.followUps || [];
+  return {
+    ...normalized,
+    actions,
+    suggestions: actions,
+    raw: result,
+    meta,
+  };
+}
+
+export async function summarizeAI(options = {}) {
+  const response = await apiClient.post("/api/ai/summarize", options);
+  const { payload: result, meta } = unwrapEnvelope(response.data);
+  const payload =
+    typeof result === "string"
+      ? { summary: result, answer: result }
+      : ensureObject(result);
+  const normalized = normalizeAiResponse(payload);
+  const summary =
+    payload.summary ||
+    normalized.answer ||
+    (typeof result === "string" ? result : "");
+  return {
+    ...normalized,
+    summary,
+    raw: result,
+    meta,
+  };
+}
+
 export async function getWorkflows(params = {}) {
   const response = await apiClient.get("/api/workflows", { params });
   const { payload, meta } = unwrapEnvelope(response.data);
