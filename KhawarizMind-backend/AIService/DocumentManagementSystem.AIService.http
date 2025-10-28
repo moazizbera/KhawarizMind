@@ -1,6 +1,24 @@
 @DocumentManagementSystem.AIService_HostAddress = http://localhost:5281
 
-GET {{DocumentManagementSystem.AIService_HostAddress}}/weatherforecast/
-Accept: application/json
+### Query the mock AI service (JSON response)
+POST {{DocumentManagementSystem.AIService_HostAddress}}/api/ai/query
+Content-Type: application/json
+X-Roles: ai.query
 
-###
+{
+  "prompt": "Summarize the latest workflow activity.",
+  "contextId": "demo-workflow",
+  "contextLabel": "Invoice approval",
+  "stream": false
+}
+
+### Stream a mock AI response using server-sent events
+POST {{DocumentManagementSystem.AIService_HostAddress}}/api/ai/query
+Accept: text/event-stream
+Content-Type: application/json
+X-Roles: ai.query
+
+{
+  "prompt": "List the next steps for the approval queue.",
+  "stream": true
+}
