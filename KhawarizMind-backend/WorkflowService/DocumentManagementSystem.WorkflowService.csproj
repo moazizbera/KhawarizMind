@@ -4,14 +4,13 @@
 	  <DisableWebConfigGeneration>true</DisableWebConfigGeneration>
 	  <EnableDefaultContentItems>false</EnableDefaultContentItems>
 	  <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.9" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.3" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
