@@ -10,6 +10,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddCommonJwtAuthentication();
 
+var dataDirectory = Path.Combine(AppContext.BaseDirectory, "App_Data");
+Directory.CreateDirectory(dataDirectory);
+builder.Services.AddSingleton(new WorkflowRepository(Path.Combine(dataDirectory, "workflows.json")));
+
 var app = builder.Build();
 
 InMemoryStore.EnsureSeeded();
