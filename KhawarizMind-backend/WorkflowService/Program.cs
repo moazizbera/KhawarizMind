@@ -1,12 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
-using DocumentManagementSystem.Common.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddJwtAuthentication(builder.Configuration);
 
 var dataDirectory = Path.Combine(AppContext.BaseDirectory, "App_Data");
 Directory.CreateDirectory(dataDirectory);
@@ -19,21 +17,18 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
-
 app.MapGet("/api/workflows", async (WorkflowRepository repository) =>
 {
     var items = await repository.GetAllAsync();
     var ordered = items.OrderByDescending(w => w.UpdatedAt).ToList();
     return Results.Ok(ordered);
-}).RequireAuthorization(AuthorizationPolicies.RequireTenantUser);
+});
 
 app.MapGet("/api/workflows/{id:guid}", async (Guid id, WorkflowRepository repository) =>
 {
     var workflow = await repository.GetAsync(id);
     return workflow is null ? Results.NotFound() : Results.Ok(workflow);
-}).RequireAuthorization(AuthorizationPolicies.RequireTenantUser);
+});
 
 app.MapPost("/api/workflows", async (WorkflowUpsertRequest request, WorkflowRepository repository) =>
 {
@@ -58,7 +53,7 @@ app.MapPost("/api/workflows", async (WorkflowUpsertRequest request, WorkflowRepo
 
     await repository.SaveAsync(workflow);
     return Results.Created($"/api/workflows/{workflow.Id}", workflow);
-}).RequireAuthorization(AuthorizationPolicies.RequireAdministrator);
+});
 
 app.MapPut("/api/workflows/{id:guid}", async (Guid id, WorkflowUpsertRequest request, WorkflowRepository repository) =>
 {
@@ -100,7 +95,7 @@ app.MapPut("/api/workflows/{id:guid}", async (Guid id, WorkflowUpsertRequest req
 
     await repository.SaveAsync(existing);
     return Results.Ok(existing);
-}).RequireAuthorization(AuthorizationPolicies.RequireAdministrator);
+});
 
 app.Run();
 
