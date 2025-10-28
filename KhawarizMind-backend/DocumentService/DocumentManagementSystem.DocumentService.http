@@ -1,6 +1,28 @@
 @DocumentManagementSystem.DocumentService_HostAddress = http://localhost:5255
+@DocumentManagementSystem.DocumentService_Bearer = editor
 
-GET {{DocumentManagementSystem.DocumentService_HostAddress}}/weatherforecast/
+### List documents
+GET {{DocumentManagementSystem.DocumentService_HostAddress}}/api/documents
+Authorization: Bearer {{DocumentManagementSystem.DocumentService_Bearer}}
 Accept: application/json
 
-###
+### Search documents
+GET {{DocumentManagementSystem.DocumentService_HostAddress}}/api/documents?search=report
+Authorization: Bearer {{DocumentManagementSystem.DocumentService_Bearer}}
+Accept: application/json
+
+### Upload document
+POST {{DocumentManagementSystem.DocumentService_HostAddress}}/api/documents/upload
+Authorization: Bearer {{DocumentManagementSystem.DocumentService_Bearer}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.txt"
+Content-Type: text/plain
+
+Hello from KhawarizMind!
+--WebAppBoundary--
+
+### Delete document (replace {id})
+DELETE {{DocumentManagementSystem.DocumentService_HostAddress}}/api/documents/{id}
+Authorization: Bearer {{DocumentManagementSystem.DocumentService_Bearer}}
