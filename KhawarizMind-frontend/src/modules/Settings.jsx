@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 import {
   Alert,
   Box,
@@ -15,6 +15,7 @@ import {
   Paper,
   Radio,
   RadioGroup,
+  Snackbar,
   Stack,
   Switch,
   Tab,
@@ -24,350 +25,161 @@ import {
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
-import { useThemeMode } from "../context/ThemeContext";
-import {
-  useSettings,
-  createDefaultIntegrations,
-  createDefaultNotifications,
-} from "../context/SettingsContext";
+import { useSettings } from "../context/SettingsContext";
+import { getErrorMessage } from "../services/api";
 
-const a11yProps = (value) => ({
-  id: `settings-tab-${value}`,
-  "aria-controls": `settings-tabpanel-${value}`,
-});
-
-const formatTimestamp = (value, locale) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
+function TabPanel({ value, current, children }) {
+  if (value !== current) {
+    return null;
   }
-
-  try {
-    const formatter = new Intl.DateTimeFormat(
-      locale === "ar" ? "ar" : undefined,
-      {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }
-    );
-    return formatter.format(date);
-  } catch (error) {
-    console.warn("Failed to format timestamp", error);
-    return date.toLocaleString();
-  }
-};
-
-function TabPanel({ current, value, children }) {
   return (
-    <Box
-      role="tabpanel"
-      hidden={current !== value}
-      id={`settings-tabpanel-${value}`}
-      aria-labelledby={`settings-tab-${value}`}
-      sx={{ pt: 3 }}
-    >
-      {current === value ? children : null}
+    <Box role="tabpanel" sx={{ py: 3 }}>
+      {children}
     </Box>
   );
 }
 
+function formatTimestamp(value, lang) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const locale = lang === "ar" ? "ar" : "en";
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function Settings() {
   const { t } = useTranslation();
-  const { lang, setLanguage } = useLanguage();
-  const { mode, setThemeMode } = useThemeMode();
+  const { lang } = useLanguage();
   const {
-    settings: settingsState,
-    loading: settingsLoading,
-    isHydrated: settingsHydrated,
-    error: settingsError,
-    clearError,
-    saveSettings,
+    loading,
+    error,
+    updateSection,
+    savingSection,
+    preferences,
+    notifications,
+    integrations,
     auditLogs,
-    auditLoading,
-    appendAuditLog,
+    canEdit,
+    requiredRoles,
+    missingRoles,
   } = useSettings();
+
   const isRtl = lang === "ar";
 
-  const settingsLanguage = settingsState?.language ?? lang;
-  const settingsTheme = settingsState?.theme ?? mode;
-  const settingsNotifications = settingsState?.notifications;
-  const settingsIntegrations = settingsState?.integrations;
-  const userRoles = Array.isArray(settingsState?.userRoles)
-    ? settingsState.userRoles
-    : [];
-  const requiredRoles = Array.isArray(settingsState?.requiredRoles)
-    ? settingsState.requiredRoles
-    : [];
-
   const [activeTab, setActiveTab] = useState("localization");
-  const [savingSection, setSavingSection] = useState("");
-  const [feedback, setFeedback] = useState({ type: "", message: "" });
-  const [dirty, setDirty] = useState({
-    localization: false,
-    theming: false,
-    notifications: false,
-    integrations: false,
-  });
-  const baseNotifications = useMemo(
-    () => ({
-      ...createDefaultNotifications(),
-      ...(settingsNotifications || {}),
-    }),
-    [settingsNotifications]
-  );
-  const baseIntegrations = useMemo(
-    () => ({
-      ...createDefaultIntegrations(),
-      ...(settingsIntegrations || {}),
-    }),
-    [settingsIntegrations]
-  );
+  const [toast, setToast] = useState({ open: false, severity: "info", message: "" });
   const [form, setForm] = useState({
-    language: settingsLanguage,
-    theme: settingsTheme,
-    notifications: baseNotifications,
-    integrations: baseIntegrations,
+    language: "en",
+    theme: "light",
+    notifications: { email: false, sms: false, push: false },
+    integrations: { slackWebhook: "", teamsWebhook: "", apiKey: "" },
   });
 
-  const sectionLabels = useMemo(
-    () => ({
-      localization: t("LocalizationTab"),
-      theming: t("ThemingTab"),
-      notifications: t("NotificationsTab"),
-      integrations: t("IntegrationsTab"),
-      system: t("AuditLogSectionSystem"),
-    }),
-    [t]
-  );
+  useEffect(() => {
+    setForm({
+      language: preferences.language || "en",
+      theme: preferences.theme || "light",
+      notifications: {
+        email: Boolean(notifications.email),
+        sms: Boolean(notifications.sms),
+        push: Boolean(notifications.push),
+      },
+      integrations: {
+        slackWebhook: integrations.slackWebhook || "",
+        teamsWebhook: integrations.teamsWebhook || "",
+        apiKey: integrations.apiKey || "",
+      },
+    });
+  }, [preferences, notifications, integrations]);
 
   const tabs = useMemo(
     () => [
-      { value: "localization", label: t("LocalizationTab") },
-      { value: "theming", label: t("ThemingTab") },
-      { value: "notifications", label: t("NotificationsTab") },
-      { value: "integrations", label: t("IntegrationsTab") },
+      { value: "localization", label: t("SettingsTabLocalization") },
+      { value: "theming", label: t("SettingsTabTheming") },
+      { value: "notifications", label: t("SettingsTabNotifications") },
+      { value: "integrations", label: t("SettingsTabIntegrations") },
     ],
     [t]
   );
 
-  const {
-    localization: isLocalizationDirty,
-    theming: isThemingDirty,
-    notifications: isNotificationsDirty,
-    integrations: isIntegrationsDirty,
-  } = dirty;
-
-  useEffect(() => {
-    if (!settingsHydrated) {
-      return;
-    }
-
-    setForm((prev) => ({
-      language: isLocalizationDirty ? prev.language : settingsLanguage,
-      theme: isThemingDirty ? prev.theme : settingsTheme,
-      notifications: isNotificationsDirty ? prev.notifications : baseNotifications,
-      integrations: isIntegrationsDirty ? prev.integrations : baseIntegrations,
-    }));
-  }, [
-    settingsHydrated,
-    settingsLanguage,
-    settingsTheme,
-    baseNotifications,
-    baseIntegrations,
-    isLocalizationDirty,
-    isThemingDirty,
-    isNotificationsDirty,
-    isIntegrationsDirty,
-  ]);
-
-  useEffect(() => {
-    setForm((prev) => {
-      if (isLocalizationDirty || prev.language === lang) {
-        return prev;
-      }
-      return { ...prev, language: lang };
-    });
-  }, [lang, isLocalizationDirty]);
-
-  useEffect(() => {
-    setForm((prev) => {
-      if (isThemingDirty || prev.theme === mode) {
-        return prev;
-      }
-      return { ...prev, theme: mode };
-    });
-  }, [mode, isThemingDirty]);
-
-  const canEdit = useMemo(() => {
-    if (!Array.isArray(requiredRoles) || requiredRoles.length === 0) {
-      return true;
-    }
-    if (!Array.isArray(userRoles) || userRoles.length === 0) {
-      return false;
-    }
-    return requiredRoles.some((role) => userRoles.includes(role));
-  }, [requiredRoles, userRoles]);
-
-  const missingRoles = useMemo(() => {
-    if (!Array.isArray(requiredRoles) || requiredRoles.length === 0) {
-      return [];
-    }
-    return requiredRoles.filter(
-      (role) => !(Array.isArray(userRoles) && userRoles.includes(role))
-    );
-  }, [requiredRoles, userRoles]);
-
-  const handleTabChange = (event, value) => {
-    setActiveTab(value);
-  };
-
-  const handleLanguageChange = (event) => {
-    const nextLanguage = event.target.value;
-    setForm((prev) => ({ ...prev, language: nextLanguage }));
-    setDirty((prev) => ({ ...prev, localization: true }));
-  };
-
-  const handleThemeChange = (event) => {
-    const nextTheme = event.target.value;
-    setForm((prev) => ({ ...prev, theme: nextTheme }));
-    setDirty((prev) => ({ ...prev, theming: true }));
-  };
-
-  const handleNotificationToggle = (key) => (event) => {
-    const isEnabled = event.target.checked;
-    setForm((prev) => ({
-      ...prev,
-      notifications: { ...prev.notifications, [key]: isEnabled },
-    }));
-    setDirty((prev) => ({ ...prev, notifications: true }));
-  };
-
-  const handleIntegrationChange = (key) => (event) => {
-    const { value } = event.target;
-    setForm((prev) => ({
-      ...prev,
-      integrations: { ...prev.integrations, [key]: value },
-    }));
-    setDirty((prev) => ({ ...prev, integrations: true }));
-  };
-
-  const handleSave = async (section) => {
-    if (!canEdit || savingSection) return;
-    if (!dirty[section]) return;
-
-    const payload = {};
-
-    switch (section) {
-      case "localization":
-        payload.language = form.language;
-        break;
-      case "theming":
-        payload.theme = form.theme;
-        break;
-      case "notifications":
-        payload.notifications = form.notifications;
-        break;
-      case "integrations":
-        payload.integrations = form.integrations;
-        break;
-      default:
-        return;
-    }
-
-    setSavingSection(section);
-    setFeedback({ type: "", message: "" });
-
-    try {
-      await saveSettings(payload);
-
-      if (section === "localization") {
-        await setLanguage(form.language, { persistToServer: false });
-      }
-      if (section === "theming") {
-        await setThemeMode(form.theme, { persistToServer: false });
-      }
-
-      setDirty((prev) => ({ ...prev, [section]: false }));
-      setFeedback({ type: "success", message: t("SettingsSaved") });
-
-      const username =
-        typeof window !== "undefined"
-          ? window.sessionStorage.getItem("km-username") ||
-            window.localStorage.getItem("km-username") ||
-            t("GuestUser")
-          : t("GuestUser");
-
-      const actionLookup = {
-        localization: t("AuditLogLocalizationUpdated"),
-        theming: t("AuditLogThemingUpdated"),
-        notifications: t("AuditLogNotificationsUpdated"),
-        integrations: t("AuditLogIntegrationsUpdated"),
-      };
-
-      const auditEntry = {
-        id: `${Date.now()}-${section}`,
-        actor: username,
-        section,
-        action:
-          actionLookup[section] ||
-          t("AuditLogFallbackAction", { section: sectionLabels[section] || section }),
-        timestamp: new Date().toISOString(),
-        details: payload,
-      };
-
-      await appendAuditLog(auditEntry);
-    } catch (error) {
-      console.error("Failed to persist settings", error);
-      clearError();
-      setFeedback({
-        type: "error",
-        message:
-          error?.response?.data?.message ||
-          error?.message ||
-          t("SettingsSaveError"),
-      });
-    } finally {
-      setSavingSection("");
-    }
-  };
-
-  const renderSaveButton = (section) => (
-    <Button
-      variant="contained"
-      onClick={() => handleSave(section)}
-      disabled={
-        !canEdit ||
-        savingSection === section ||
-        !dirty[section] ||
-        settingsLoading
-      }
-      sx={{ alignSelf: isRtl ? "flex-start" : "flex-end", minWidth: 160 }}
-    >
-      {savingSection === section ? (
-        <CircularProgress size={20} sx={{ color: "common.white" }} />
-      ) : (
-        t("SaveChanges")
-      )}
-    </Button>
+  const sectionLabels = useMemo(
+    () => ({
+      localization: t("SettingsTabLocalization"),
+      theming: t("SettingsTabTheming"),
+      notifications: t("SettingsTabNotifications"),
+      integrations: t("SettingsTabIntegrations"),
+    }),
+    [t]
   );
 
-  const roleChips = useMemo(() => {
-    if (!Array.isArray(requiredRoles)) return null;
-    return requiredRoles.map((role) => {
-      const hasRole = Array.isArray(userRoles) && userRoles.includes(role);
-      return (
-        <Chip
-          key={role}
-          label={role}
-          size="small"
-          color={hasRole ? "primary" : "default"}
-          variant={hasRole ? "filled" : "outlined"}
-          sx={{ mr: isRtl ? 0 : 1, ml: isRtl ? 1 : 0, mb: 1 }}
-        />
-      );
-    });
-  }, [requiredRoles, userRoles, isRtl]);
+  const handleTabChange = useCallback((_, value) => {
+    setActiveTab(value);
+  }, []);
+
+  const handleLanguageChange = useCallback((event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, language: value }));
+  }, []);
+
+  const handleThemeChange = useCallback((event) => {
+    const value = event.target.value;
+    setForm((prev) => ({ ...prev, theme: value }));
+  }, []);
+
+  const handleNotificationToggle = useCallback(
+    (key) => (_, checked) => {
+      setForm((prev) => ({
+        ...prev,
+        notifications: { ...prev.notifications, [key]: checked },
+      }));
+    },
+    []
+  );
+
+  const handleIntegrationChange = useCallback(
+    (key) => (event) => {
+      const value = event.target.value;
+      setForm((prev) => ({
+        ...prev,
+        integrations: { ...prev.integrations, [key]: value },
+      }));
+    },
+    []
+  );
+
+  const showToast = useCallback((severity, message) => {
+    setToast({ open: true, severity, message });
+  }, []);
+
+  const handleSave = useCallback(
+    async (section) => {
+      try {
+        let payload = {};
+        if (section === "localization") {
+          payload = { language: form.language };
+        } else if (section === "theming") {
+          payload = { theme: form.theme };
+        } else if (section === "notifications") {
+          payload = { notifications: form.notifications };
+        } else if (section === "integrations") {
+          payload = { integrations: form.integrations };
+        }
+        await updateSection(section, payload);
+        showToast("success", t("SettingsSaveSuccess"));
+      } catch (err) {
+        showToast("error", getErrorMessage(err, t("SettingsSaveError")));
+      }
+    },
+    [form, showToast, t, updateSection]
+  );
+
+  const auditEntries = auditLogs.map((entry) => ({
+    ...entry,
+    sectionLabel: sectionLabels[entry.section] || entry.section,
+  }));
 
   return (
     <Paper
@@ -377,12 +189,17 @@ export default function Settings() {
       <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>
         {t("Settings")}
       </Typography>
-      <Typography sx={{ color: "text.secondary", mb: 3 }}>
+      <Typography sx={{ color: "text.secondary" }}>
         {t("SettingsDescription")}
       </Typography>
 
-      {settingsLoading && (
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+      {loading && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ mt: 2, mb: 2 }}
+        >
           <CircularProgress size={18} />
           <Typography variant="body2" color="text.secondary">
             {t("SettingsLoading")}
@@ -390,43 +207,36 @@ export default function Settings() {
         </Stack>
       )}
 
-      {settingsError && (
-        <Alert
-          severity="error"
-          onClose={clearError}
-          sx={{ mb: 2 }}
-        >
-          {settingsError?.response?.data?.message ||
-            settingsError?.message ||
-            t("SettingsLoadError")}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
         </Alert>
       )}
 
-      {feedback.message && (
-        <Alert
-          severity={feedback.type === "success" ? "success" : "error"}
-          onClose={() => setFeedback({ type: "", message: "" })}
-          sx={{ mb: 2 }}
-        >
-          {feedback.message}
-        </Alert>
-      )}
-
-      {!canEdit && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t("SettingsAccessDenied", {
-            roles: (missingRoles.length ? missingRoles : requiredRoles).join(", "),
-          })}
-        </Alert>
-      )}
+      {(() => {
+        const deniedRoles = (Array.isArray(missingRoles) && missingRoles.length > 0)
+          ? missingRoles
+          : Array.isArray(requiredRoles)
+          ? requiredRoles
+          : [];
+        return !canEdit && deniedRoles.length > 0 ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {t("SettingsAccessDenied", {
+              roles: deniedRoles.join(", "),
+            })}
+          </Alert>
+        ) : null;
+      })()}
 
       {Array.isArray(requiredRoles) && requiredRoles.length > 0 && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", mb: 1 }}>
             {t("SettingsRequiredRolesLabel")}
           </Typography>
-          <Stack direction="row" flexWrap="wrap" sx={{ mt: 1 }}>
-            {roleChips}
+          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+            {requiredRoles.map((role) => (
+              <Chip key={role} label={role} color="primary" variant="outlined" />
+            ))}
           </Stack>
         </Box>
       )}
@@ -437,10 +247,10 @@ export default function Settings() {
         variant="scrollable"
         allowScrollButtonsMobile
         aria-label={t("SettingsTabsAriaLabel")}
-        sx={{ borderBottom: 1, borderColor: "divider" }}
+        sx={{ borderBottom: 1, borderColor: "divider", mt: 3 }}
       >
         {tabs.map((tab) => (
-          <Tab key={tab.value} label={tab.label} value={tab.value} {...a11yProps(tab.value)} />
+          <Tab key={tab.value} label={tab.label} value={tab.value} />
         ))}
       </Tabs>
 
@@ -449,10 +259,7 @@ export default function Settings() {
           <Typography variant="body2" color="text.secondary">
             {t("LocalizationDescription")}
           </Typography>
-          <FormControl
-            component="fieldset"
-            disabled={!canEdit || savingSection === "localization"}
-          >
+          <FormControl component="fieldset" disabled={!canEdit || savingSection === "localization"}>
             <FormLabel>{t("LocalizationLanguageLabel")}</FormLabel>
             <RadioGroup
               row
@@ -472,7 +279,17 @@ export default function Settings() {
               />
             </RadioGroup>
           </FormControl>
-          {renderSaveButton("localization")}
+          <Box>
+            <Button
+              variant="contained"
+              onClick={() => handleSave("localization")}
+              disabled={!canEdit || savingSection === "localization"}
+            >
+              {savingSection === "localization"
+                ? t("SettingsSaving")
+                : t("SettingsSaveAction")}
+            </Button>
+          </Box>
         </Stack>
       </TabPanel>
 
@@ -481,10 +298,7 @@ export default function Settings() {
           <Typography variant="body2" color="text.secondary">
             {t("ThemingDescription")}
           </Typography>
-          <FormControl
-            component="fieldset"
-            disabled={!canEdit || savingSection === "theming"}
-          >
+          <FormControl component="fieldset" disabled={!canEdit || savingSection === "theming"}>
             <FormLabel>{t("ThemingModeLabel")}</FormLabel>
             <RadioGroup
               row
@@ -504,7 +318,17 @@ export default function Settings() {
               />
             </RadioGroup>
           </FormControl>
-          {renderSaveButton("theming")}
+          <Box>
+            <Button
+              variant="contained"
+              onClick={() => handleSave("theming")}
+              disabled={!canEdit || savingSection === "theming"}
+            >
+              {savingSection === "theming"
+                ? t("SettingsSaving")
+                : t("SettingsSaveAction")}
+            </Button>
+          </Box>
         </Stack>
       </TabPanel>
 
@@ -543,7 +367,17 @@ export default function Settings() {
             }
             label={t("NotificationPush")}
           />
-          {renderSaveButton("notifications")}
+          <Box>
+            <Button
+              variant="contained"
+              onClick={() => handleSave("notifications")}
+              disabled={!canEdit || savingSection === "notifications"}
+            >
+              {savingSection === "notifications"
+                ? t("SettingsSaving")
+                : t("SettingsSaveAction")}
+            </Button>
+          </Box>
         </Stack>
       </TabPanel>
 
@@ -578,7 +412,17 @@ export default function Settings() {
             type="password"
             helperText={t("IntegrationsSecurityNote")}
           />
-          {renderSaveButton("integrations")}
+          <Box>
+            <Button
+              variant="contained"
+              onClick={() => handleSave("integrations")}
+              disabled={!canEdit || savingSection === "integrations"}
+            >
+              {savingSection === "integrations"
+                ? t("SettingsSaving")
+                : t("SettingsSaveAction")}
+            </Button>
+          </Box>
         </Stack>
       </TabPanel>
 
@@ -591,93 +435,76 @@ export default function Settings() {
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {t("AuditLogSubtitle")}
         </Typography>
-        {auditLoading && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <CircularProgress size={16} />
-            <Typography variant="caption" color="text.secondary">
-              {t("SettingsLoading")}
-            </Typography>
-          </Stack>
-        )}
-        {auditLogs.length === 0 ? (
-          <Typography color="text.secondary">{t("AuditLogEmpty")}</Typography>
+        {auditEntries.length === 0 ? (
+          <Typography color="text.secondary">
+            {t("AuditLogEmpty")}
+          </Typography>
         ) : (
           <List sx={{ p: 0 }}>
-            {auditLogs.map((entry) => {
-              const sectionLabel = sectionLabels[entry.section] || entry.section;
-              const action =
-                entry.action ||
-                t("AuditLogFallbackAction", { section: sectionLabel });
-              let actor = entry.actor || "";
-              if (!actor.trim()) {
-                actor = t("AuditLogActorUnknown");
-              } else if (actor.trim().toLowerCase() === "system") {
-                actor = t("AuditLogActorSystem");
-              }
-              const timestamp = formatTimestamp(entry.timestamp, lang);
-              const detailsValue = entry.details;
-              let detailsSummary = null;
-              if (detailsValue && typeof detailsValue === "object") {
-                const keys = Object.keys(detailsValue);
-                if (keys.length > 0) {
-                  detailsSummary = JSON.stringify(detailsValue);
-                }
-              } else if (
-                typeof detailsValue === "string" &&
-                detailsValue.trim() !== ""
-              ) {
-                detailsSummary = detailsValue;
-              } else if (
-                typeof detailsValue === "number" ||
-                typeof detailsValue === "boolean"
-              ) {
-                detailsSummary = String(detailsValue);
-              }
-
-              return (
-                <ListItem key={entry.id} alignItems="flex-start" sx={{ px: 0 }}>
-                  <ListItemText
-                    primary={
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        flexWrap="wrap"
-                      >
-                        <Typography variant="subtitle2">{action}</Typography>
-                        <Chip
-                          size="small"
-                          label={sectionLabel}
-                          color="primary"
-                          variant="outlined"
-                        />
-                      </Stack>
-                    }
-                    secondary={
-                      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {t("AuditLogSecondaryLine", {
-                            actor,
-                            time: timestamp,
-                          })}
+            {auditEntries.map((entry) => (
+              <ListItem key={entry.id} alignItems="flex-start" sx={{ px: 0 }}>
+                <ListItemText
+                  primary={
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      flexWrap="wrap"
+                    >
+                      <Typography variant="subtitle2">{entry.action}</Typography>
+                      <Chip
+                        size="small"
+                        label={entry.sectionLabel}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Stack>
+                  }
+                  secondary={
+                    <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t("AuditLogSecondaryLine", {
+                          actor:
+                            entry.actor && entry.actor.trim()
+                              ? entry.actor
+                              : t("AuditLogActorUnknown"),
+                          time: formatTimestamp(entry.timestamp, lang),
+                        })}
+                      </Typography>
+                      {entry.details ? (
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.disabled", wordBreak: "break-word" }}
+                        >
+                          {typeof entry.details === "string"
+                            ? entry.details
+                            : JSON.stringify(entry.details)}
                         </Typography>
-                        {detailsSummary ? (
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.disabled", wordBreak: "break-word" }}
-                          >
-                            {detailsSummary}
-                          </Typography>
-                        ) : null}
-                      </Stack>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
+                      ) : null}
+                    </Stack>
+                  }
+                />
+              </ListItem>
+            ))}
           </List>
         )}
       </Box>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: isRtl ? "left" : "right" }}
+      >
+        <Alert
+          severity={toast.severity}
+          variant="filled"
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }

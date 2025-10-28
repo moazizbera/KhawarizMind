@@ -1,94 +1,59 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { createContext, useCallback, useContext, useMemo } from "react";
 import { useSettings } from "./SettingsContext";
+import { getErrorMessage } from "../services/api";
 
 const LanguageContext = createContext();
 
 const DEFAULT_LANGUAGE = "en";
 
 export function LanguageProvider({ children }) {
-  const getInitialLanguage = () => {
-    if (typeof window === "undefined") {
-      return DEFAULT_LANGUAGE;
-    }
-    return window.localStorage.getItem("lang") || DEFAULT_LANGUAGE;
-  };
-
   const {
-    settings,
-    saveSettings,
-    isHydrated: settingsHydrated,
+    preferences,
+    updateSection,
+    loading,
     error: settingsError,
   } = useSettings();
-  const settingsLanguage = settings?.language;
 
-  const [lang, setLangState] = useState(getInitialLanguage);
-  const [hydrated, setHydrated] = useState(false);
-  const langRef = useRef(lang);
-
-  useEffect(() => {
-    langRef.current = lang;
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("lang", lang);
-    }
-  }, [lang]);
-
-  useEffect(() => {
-    if (!settingsHydrated) {
-      return;
-    }
-
-    if (!settingsError && settingsLanguage && settingsLanguage !== langRef.current) {
-      setLangState(settingsLanguage);
-    }
-    setHydrated(true);
-  }, [settingsHydrated, settingsLanguage, settingsError]);
-
-  const persistLanguage = useCallback(async (nextLanguage, options = {}) => {
-    const { persistToServer = true } = options;
-    const previous = langRef.current;
-
-    setLangState(nextLanguage);
-    langRef.current = nextLanguage;
-
-    if (!persistToServer) {
-      return nextLanguage;
-    }
-
-    try {
-      await saveSettings({ language: nextLanguage });
-      return nextLanguage;
-    } catch (error) {
-      console.error("Failed to update language preference", error);
-      setLangState(previous);
-      langRef.current = previous;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("lang", previous);
-      }
-      throw error;
-    }
-  }, [saveSettings]);
-
-  const toggleLanguage = useCallback(() => {
-    const next = langRef.current === "en" ? "ar" : "en";
-    return persistLanguage(next);
-  }, [persistLanguage]);
+  const lang = preferences.language || DEFAULT_LANGUAGE;
 
   const setLanguage = useCallback(
-    (nextLanguage, options) => persistLanguage(nextLanguage, options),
-    [persistLanguage]
+    async (nextLanguage, options = {}) => {
+      if (!nextLanguage) return lang;
+      const shouldPersist = options?.persist !== false;
+      if (!shouldPersist) {
+        return nextLanguage;
+      }
+      try {
+        await updateSection("localization", { language: nextLanguage });
+        return nextLanguage;
+      } catch (err) {
+        const message = getErrorMessage(err, "Failed to update language");
+        console.error(message, err);
+        throw err;
+      }
+    },
+    [lang, updateSection]
+  );
+
+  const toggleLanguage = useCallback(() => {
+    const next = lang === "en" ? "ar" : "en";
+    return setLanguage(next);
+  }, [lang, setLanguage]);
+
+  const value = useMemo(
+    () => ({
+      lang,
+      setLanguage,
+      toggleLanguage,
+      isHydrated: !loading,
+      loading,
+      error: settingsError,
+    }),
+    [lang, setLanguage, toggleLanguage, loading, settingsError]
   );
 
   return (
-    <LanguageContext.Provider
-      value={{ lang, toggleLanguage, setLanguage, isHydrated: hydrated }}
-    >
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
