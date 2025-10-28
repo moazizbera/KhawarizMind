@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { getSettings, updateSettings } from "../services/api";
+import { useSettings } from "./SettingsContext";
 
 const ThemeModeContext = createContext();
 
@@ -24,6 +24,14 @@ export function ThemeModeProvider({ children }) {
     return prefersDark ? "dark" : DEFAULT_THEME_MODE;
   };
 
+  const {
+    settings,
+    saveSettings,
+    isHydrated: settingsHydrated,
+    error: settingsError,
+  } = useSettings();
+  const settingsTheme = settings?.theme;
+
   const [mode, setMode] = useState(getInitial);
   const [hydrated, setHydrated] = useState(false);
   const modeRef = useRef(mode);
@@ -37,57 +45,43 @@ export function ThemeModeProvider({ children }) {
   }, [mode]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!settingsHydrated) {
+      return;
+    }
 
-    async function syncWithServer() {
+    if (!settingsError && settingsTheme && settingsTheme !== modeRef.current) {
+      setMode(settingsTheme);
+    }
+    setHydrated(true);
+  }, [settingsHydrated, settingsTheme, settingsError]);
+
+  const persistMode = useCallback(
+    async (nextMode, options = {}) => {
+      const { persistToServer = true } = options;
+      const previous = modeRef.current;
+
+      setMode(nextMode);
+      modeRef.current = nextMode;
+
+      if (!persistToServer) {
+        return nextMode;
+      }
+
       try {
-        const data = await getSettings();
-        if (cancelled) return;
-
-        const serverMode = data?.preferences?.theme || data?.theme || null;
-        if (serverMode && serverMode !== modeRef.current) {
-          setMode(serverMode);
-        }
+        await saveSettings({ theme: nextMode });
+        return nextMode;
       } catch (error) {
-        console.warn("Failed to hydrate theme settings", error);
-      } finally {
-        if (!cancelled) {
-          setHydrated(true);
+        console.error("Failed to update theme preference", error);
+        setMode(previous);
+        modeRef.current = previous;
+        if (typeof window !== "undefined") {
+          document.documentElement.setAttribute("data-theme", previous);
         }
+        throw error;
       }
-    }
-
-    syncWithServer();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const persistMode = useCallback(async (nextMode, options = {}) => {
-    const { persistToServer = true } = options;
-    const previous = modeRef.current;
-
-    setMode(nextMode);
-    modeRef.current = nextMode;
-
-    if (!persistToServer) {
-      return nextMode;
-    }
-
-    try {
-      await updateSettings({ theme: nextMode });
-      return nextMode;
-    } catch (error) {
-      console.error("Failed to update theme preference", error);
-      setMode(previous);
-      modeRef.current = previous;
-      if (typeof window !== "undefined") {
-        document.documentElement.setAttribute("data-theme", previous);
-      }
-      throw error;
-    }
-  }, []);
+    },
+    [saveSettings]
+  );
 
   const toggleTheme = useCallback(() => {
     const next = modeRef.current === "light" ? "dark" : "light";

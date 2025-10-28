@@ -25,6 +25,7 @@ import TranslateIcon from "@mui/icons-material/Translate";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 
+import { SettingsProvider } from "./context/SettingsContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import { ThemeModeProvider, useThemeMode } from "./context/ThemeContext";
 
@@ -141,10 +142,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <ThemeModeProvider>
-        <AppContent />
-      </ThemeModeProvider>
-    </LanguageProvider>
+    <SettingsProvider>
+      <LanguageProvider>
+        <ThemeModeProvider>
+          <AppContent />
+        </ThemeModeProvider>
+      </LanguageProvider>
+    </SettingsProvider>
   );
 }
