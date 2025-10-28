@@ -1,12 +1,32 @@
+using DocumentManagementSystem.Common.Configuration;
+using Microsoft.Extensions.Options;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Configuration.AddEnvironmentVariables();
+
 builder.Services.AddOpenApi();
+
+builder.Services.AddOptions<IntegrationSecretsOptions>()
+    .Bind(builder.Configuration.GetSection(IntegrationSecretsOptions.SectionName))
+    .PostConfigure(options => options.ApplyEnvironmentOverrides(builder.Configuration))
+    .Validate(options =>
+    {
+        try
+        {
+            options.Validate();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }, "Integration secrets are not configured correctly. Ensure required environment variables are provided.");
+
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<IntegrationSecretsOptions>>().Value);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -14,28 +34,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/integration/health", (IntegrationSecretsOptions options) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    return Results.Ok(new
+    {
+        SecretsConfigured = !string.IsNullOrWhiteSpace(options.ApiKey) &&
+                             !string.IsNullOrWhiteSpace(options.WebhookSecret)
+    });
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
