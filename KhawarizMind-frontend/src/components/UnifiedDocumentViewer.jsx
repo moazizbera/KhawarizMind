@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, CircularProgress, Paper } from "@mui/material";
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Paper,
+  Stack,
+  FormControlLabel,
+  Switch,
+  Chip,
+} from "@mui/material";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +27,66 @@ export default function UnifiedDocumentViewer({ fileUrl, fileName }) {
   const [loading, setLoading] = useState(true);
   const [showOcr, setShowOcr] = useState(true);
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [metadata] = useState([]);
+  const [ocrLayers] = useState([]);
+
+  const renderMetadata = () => {
+    if (!metadata.length && !ocrLayers.length) {
+      return (
+        <Typography variant="caption" color="text.secondary">
+          {t("NoMetadata", { defaultValue: "No metadata available." })}
+        </Typography>
+      );
+    }
+
+    return (
+      <Stack spacing={1} sx={{ width: "100%" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="flex-start">
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showOcr}
+                onChange={(event) => setShowOcr(event.target.checked)}
+              />
+            }
+            label={t("ToggleOcr", { defaultValue: "Show OCR overlay" })}
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showAnnotations}
+                onChange={(event) => setShowAnnotations(event.target.checked)}
+              />
+            }
+            label={t("ToggleAnnotations", { defaultValue: "Show annotations" })}
+          />
+        </Stack>
+        {!!metadata.length && (
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {metadata.map((item, index) => (
+              <Chip
+                key={`${item?.label || "meta"}-${index}`}
+                size="small"
+                label={`${item?.label || t("Metadata", { defaultValue: "Metadata" })}: ${
+                  item?.value ?? "-"
+                }`}
+              />
+            ))}
+          </Stack>
+        )}
+        {!!ocrLayers.length && (
+          <Typography variant="caption" color="text.secondary">
+            {t("OcrLayerCount", {
+              defaultValue: "Detected {count} OCR layers.",
+              count: ocrLayers.length,
+            })}
+          </Typography>
+        )}
+      </Stack>
+    );
+  };
 
   useEffect(() => {
     if (!fileName && !fileUrl) return;
