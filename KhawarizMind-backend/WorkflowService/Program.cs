@@ -1,18 +1,10 @@
-using System.Security.Claims;
-using DocumentManagementSystem.Common.Authentication;
-using DocumentManagementSystem.Common.Data;
-using DocumentManagementSystem.Common.Models.Workflows;
-using Microsoft.AspNetCore.Authorization;
+using DocumentManagementSystem.Common;
+using DocumentManagementSystem.Common.Workflows;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddCommonJwtAuthentication();
-
-var dataDirectory = Path.Combine(AppContext.BaseDirectory, "App_Data");
-Directory.CreateDirectory(dataDirectory);
-builder.Services.AddSingleton(new WorkflowRepository(Path.Combine(dataDirectory, "workflows.json")));
+builder.Services.AddOpenApi();
+builder.Services.AddSingleton<SharedAppStore>();
 
 var app = builder.Build();
 
@@ -24,72 +16,127 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-
-var group = app.MapGroup("/api/workflows").RequireAuthorization();
-
-group.MapGet("", () => Results.Ok(InMemoryStore.Workflows.Values.OrderBy(w => w.Name)));
-
-group.MapGet("/{id:guid}", (Guid id) =>
-    InMemoryStore.Workflows.TryGetValue(id, out var workflow)
-        ? Results.Ok(workflow)
-        : Results.NotFound());
-
-group.MapPost("", [Authorize(Policy = AppPolicies.WorkflowWrite)] (WorkflowUpsertRequest request, ClaimsPrincipal user) =>
+app.MapGet("/api/workflows", (SharedAppStore store, HttpContext context) =>
 {
-    if (string.IsNullOrWhiteSpace(request.Name))
+    if (!RoleGuard.HasAllRoles(context, RoleConstants.WorkflowViewer))
     {
-        return Results.BadRequest("Workflow name is required.");
+        return RoleGuard.Forbid(context, RoleConstants.WorkflowViewer);
     }
 
+    var workflows = store.GetWorkflows();
+    return Results.Ok(workflows);
+});
+
+app.MapGet("/api/workflows/{id:guid}", (Guid id, SharedAppStore store, HttpContext context) =>
+{
+    if (!RoleGuard.HasAllRoles(context, RoleConstants.WorkflowViewer))
+    {
+        return RoleGuard.Forbid(context, RoleConstants.WorkflowViewer);
+    }
+
+    var workflow = store.GetWorkflow(id);
+    return workflow is null ? Results.NotFound() : Results.Ok(workflow);
+});
+
+app.MapPost("/api/workflows", (WorkflowUpsertRequest request, SharedAppStore store, HttpContext context) =>
+{
+    if (request is null)
+    {
+        return Results.BadRequest(new { message = "Request payload is required." });
+    }
+
+    if (!RoleGuard.HasAllRoles(context, RoleConstants.WorkflowManager))
+    {
+        return RoleGuard.Forbid(context, RoleConstants.WorkflowManager);
+    }
+
+    var now = DateTime.UtcNow;
+    var nodes = WorkflowHelpers.NormalizeNodes(request.Nodes);
     var workflow = new WorkflowDefinition
     {
         Id = Guid.NewGuid(),
-        Name = request.Name,
-        Description = request.Description ?? string.Empty,
-        Steps = request.Steps?.Select(s => new WorkflowStep(s.Name, s.Description ?? string.Empty)).ToList() ?? new List<WorkflowStep>()
+        Name = string.IsNullOrWhiteSpace(request.Name) ? "Untitled workflow" : request.Name.Trim(),
+        Description = request.Description?.Trim() ?? string.Empty,
+        Owner = string.IsNullOrWhiteSpace(request.Owner) ? "KhawarizMind" : request.Owner.Trim(),
+        Status = WorkflowHelpers.NormalizeStatus(request.Status),
+        SlaMinutes = request.SlaMinutes,
+        CreatedAt = now,
+        UpdatedAt = now,
+        DueAt = request.DueAt ?? WorkflowHelpers.CalculateDueAt(now, request.SlaMinutes),
+        Nodes = nodes,
+        Edges = WorkflowHelpers.NormalizeEdges(request.Edges),
+        Stages = WorkflowHelpers.NormalizeStages(request.Stages, nodes),
+        Activities = WorkflowHelpers.NormalizeActivities(request.Activities, nodes),
     };
 
-    InMemoryStore.Workflows[workflow.Id] = workflow;
-
-    return Results.Created($"/api/workflows/{workflow.Id}", workflow);
+    var saved = store.SaveWorkflow(workflow);
+    return Results.Created($"/api/workflows/{saved.Id}", saved);
 });
 
-group.MapPut("/{id:guid}", [Authorize(Policy = AppPolicies.WorkflowWrite)] (Guid id, WorkflowUpsertRequest request) =>
+app.MapPost("/api/workflows/{id:guid}/activate", (Guid id, SharedAppStore store, HttpContext context) =>
 {
-    if (!InMemoryStore.Workflows.TryGetValue(id, out var workflow))
+    if (!RoleGuard.HasAllRoles(context, RoleConstants.WorkflowAdmin))
+    {
+        return RoleGuard.Forbid(context, RoleConstants.WorkflowAdmin);
+    }
+
+    var workflow = store.GetWorkflow(id);
+    if (workflow is null)
     {
         return Results.NotFound();
     }
 
-    if (!string.IsNullOrWhiteSpace(request.Name))
+    var now = DateTime.UtcNow;
+    workflow.Status = WorkflowHelpers.StatusActive;
+    workflow.UpdatedAt = now;
+    workflow.DueAt ??= WorkflowHelpers.CalculateDueAt(now, workflow.SlaMinutes);
+    workflow.Activities ??= new List<WorkflowActivity>();
+    workflow.Activities.Add(new WorkflowActivity
     {
-        workflow.Name = request.Name;
-    }
+        Id = $"activation-{now.Ticks}",
+        Title = "Workflow activated",
+        Description = "Activated via WorkflowService mock API.",
+        Status = WorkflowHelpers.StatusActive,
+        Timestamp = now,
+        Assignee = context.Request.Headers.TryGetValue("X-Activated-By", out var activatedBy)
+            ? activatedBy.ToString()
+            : "system",
+    });
 
-    workflow.Description = request.Description ?? workflow.Description;
-    if (request.Steps is not null)
-    {
-        workflow.Steps = request.Steps.Select(s => new WorkflowStep(s.Name, s.Description ?? string.Empty)).ToList();
-    }
-
-    return Results.Ok(workflow);
+    var saved = store.SaveWorkflow(workflow);
+    return Results.Ok(saved);
 });
 
-group.MapDelete("/{id:guid}", [Authorize(Policy = AppPolicies.WorkflowWrite)] (Guid id) =>
-    InMemoryStore.Workflows.TryRemove(id, out _)
-        ? Results.NoContent()
-        : Results.NotFound());
+app.MapGet("/", () => Results.Ok(new
+{
+    service = "WorkflowService",
+    status = "ok",
+    limitations = WorkflowLimitations,
+}));
 
 app.Run();
 
-record WorkflowUpsertRequest
+internal sealed record WorkflowUpsertRequest
 {
-    public string Name { get; init; } = string.Empty;
+    public string? Name { get; init; }
     public string? Description { get; init; }
-    public IEnumerable<WorkflowStepContract>? Steps { get; init; }
+    public string? Owner { get; init; }
+    public string? Status { get; init; }
+    public int? SlaMinutes { get; init; }
+    public DateTime? DueAt { get; init; }
+    public List<WorkflowNode>? Nodes { get; init; }
+    public List<WorkflowEdge>? Edges { get; init; }
+    public List<WorkflowStage>? Stages { get; init; }
+    public List<WorkflowActivity>? Activities { get; init; }
 }
 
-record WorkflowStepContract(string Name, string? Description);
+internal static class WorkflowLimitations
+{
+    public static readonly IReadOnlyList<string> Value = new[]
+    {
+        "Workflows are stored in-memory using a shared demo store.",
+        "Persistence resets when the service restarts.",
+    };
+
+    public static implicit operator IReadOnlyList<string>(WorkflowLimitations _) => Value;
+}

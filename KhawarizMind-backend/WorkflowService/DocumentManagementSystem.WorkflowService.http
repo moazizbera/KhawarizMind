@@ -1,6 +1,31 @@
 @DocumentManagementSystem.WorkflowService_HostAddress = http://localhost:5098
 
-GET {{DocumentManagementSystem.WorkflowService_HostAddress}}/weatherforecast/
+### List available workflows
+GET {{DocumentManagementSystem.WorkflowService_HostAddress}}/api/workflows
 Accept: application/json
+X-Roles: workflow.viewer
 
-###
+### Create a workflow definition
+POST {{DocumentManagementSystem.WorkflowService_HostAddress}}/api/workflows
+Content-Type: application/json
+X-Roles: workflow.viewer, workflow.manager
+
+{
+  "name": "Demo onboarding flow",
+  "description": "Captured from HTTP scratch file.",
+  "status": "draft",
+  "slaMinutes": 480,
+  "nodes": [
+    { "id": "start", "x": 100, "y": 120, "data": { "label": "Intake" } },
+    { "id": "review", "x": 320, "y": 160, "data": { "label": "Review" } }
+  ],
+  "edges": [
+    { "source": "start", "target": "review", "label": "handoff" }
+  ]
+}
+
+### Activate a workflow
+POST {{DocumentManagementSystem.WorkflowService_HostAddress}}/api/workflows/{{workflowId}}/activate
+Content-Type: application/json
+X-Roles: workflow.viewer, workflow.admin
+X-Activated-By: http-scratch
