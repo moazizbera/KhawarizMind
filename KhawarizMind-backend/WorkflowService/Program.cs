@@ -8,9 +8,12 @@ builder.Services.AddSingleton<SharedAppStore>();
 
 var app = builder.Build();
 
+InMemoryStore.EnsureSeeded();
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.MapGet("/api/workflows", (SharedAppStore store, HttpContext context) =>

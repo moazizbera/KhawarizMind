@@ -21,7 +21,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import IosShareIcon from "@mui/icons-material/IosShare";
 import { useTranslation } from "react-i18next";
 import { useLanguage } from "../context/LanguageContext";
-import { queryAI } from "../services/api";
+import { API_BASE_URL, queryAI } from "../services/api";
 
 function Bubble({ role, text, variant, caption }) {
   const isUser = role === "user";
@@ -73,6 +73,15 @@ const buildMessage = (role, text, extra = {}) => ({
 });
 
 const HISTORY_STORAGE_PREFIX = "km-ai-history";
+
+function getStoredAuthToken() {
+  if (typeof window === "undefined") return null;
+  return (
+    window.sessionStorage.getItem("km-token") ||
+    window.localStorage.getItem("km-token") ||
+    null
+  );
+}
 
 function sanitizeHistory(messages) {
   return messages

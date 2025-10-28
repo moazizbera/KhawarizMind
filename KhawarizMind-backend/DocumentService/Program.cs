@@ -1,41 +1,84 @@
+using System.Security.Claims;
+using DocumentManagementSystem.Common.Authentication;
+using DocumentManagementSystem.Common.Data;
+using DocumentManagementSystem.Common.Models.Documents;
+using Microsoft.AspNetCore.Authorization;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddCommonJwtAuthentication();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+InMemoryStore.EnsureSeeded();
+
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+var group = app.MapGroup("/api/documents").RequireAuthorization();
 
-app.MapGet("/weatherforecast", () =>
+group.MapGet("", () =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var results = InMemoryStore.Documents.Values
+        .OrderByDescending(d => d.UploadedAt)
+        .ToList();
+    return Results.Ok(results);
+});
+
+group.MapGet("/{id:guid}", (Guid id) =>
+{
+    return InMemoryStore.Documents.TryGetValue(id, out var document)
+        ? Results.Ok(document)
+        : Results.NotFound();
+});
+
+group.MapPost("/upload", [Authorize(Policy = AppPolicies.DocumentsWrite)] (ClaimsPrincipal user, UploadDocumentRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest("Document name is required.");
+    }
+
+    var id = Guid.NewGuid();
+    var owner = user.Identity?.Name ?? "unknown";
+    var document = new DocumentItem
+    {
+        Id = id,
+        Name = request.Name.Trim(),
+        Owner = owner,
+        UploadedAt = DateTimeOffset.UtcNow,
+        Tags = request.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? Array.Empty<string>(),
+        SizeInKb = request.SizeInKb ?? 0,
+        StoragePath = request.StoragePath
+    };
+
+    InMemoryStore.Documents[id] = document;
+
+    return Results.Created($"/api/documents/{id}", document);
+});
+
+group.MapDelete("/{id:guid}", [Authorize(Policy = AppPolicies.DocumentsWrite)] (Guid id) =>
+{
+    return InMemoryStore.Documents.TryRemove(id, out _)
+        ? Results.NoContent()
+        : Results.NotFound();
+});
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+record UploadDocumentRequest
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public string Name { get; init; } = string.Empty;
+    public string? StoragePath { get; init; }
+    public long? SizeInKb { get; init; }
+    public IEnumerable<string>? Tags { get; init; }
 }

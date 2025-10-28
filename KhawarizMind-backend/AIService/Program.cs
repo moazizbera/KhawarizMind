@@ -13,7 +13,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.MapPost("/api/ai/query", async Task<IResult> (
@@ -428,3 +429,12 @@ internal static class AiResponsePlanner
             ? 0
             : text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 }
+
+record AiQueryResponse
+{
+    public string Reply { get; init; } = string.Empty;
+    public IEnumerable<ReferencedDocument> ReferencedDocuments { get; init; } = Array.Empty<ReferencedDocument>();
+    public IEnumerable<string> SuggestedFollowUps { get; init; } = Array.Empty<string>();
+}
+
+record ReferencedDocument(Guid Id, string Name, string Owner);
