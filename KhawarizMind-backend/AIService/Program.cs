@@ -6,7 +6,8 @@ using DocumentManagementSystem.Common.Ai;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<SharedAppStore>();
 
 var app = builder.Build();
@@ -430,11 +431,3 @@ internal static class AiResponsePlanner
             : text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
 }
 
-record AiQueryResponse
-{
-    public string Reply { get; init; } = string.Empty;
-    public IEnumerable<ReferencedDocument> ReferencedDocuments { get; init; } = Array.Empty<ReferencedDocument>();
-    public IEnumerable<string> SuggestedFollowUps { get; init; } = Array.Empty<string>();
-}
-
-record ReferencedDocument(Guid Id, string Name, string Owner);

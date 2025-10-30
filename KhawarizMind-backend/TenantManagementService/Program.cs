@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddAuthentication(DebugAuthenticationDefaults.AuthenticationScheme)
     .AddScheme<DebugAuthenticationOptions, DebugAuthenticationHandler>(
@@ -26,9 +26,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
