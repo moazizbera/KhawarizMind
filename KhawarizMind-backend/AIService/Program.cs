@@ -65,7 +65,7 @@ app.MapPost("/api/ai/query", async Task<IResult> (
 
     if (normalized.Stream)
     {
-        return Results.Stream(async (stream, ct) =>
+        return Results.Stream(async stream =>
         {
             await using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true);
             var aggregate = new StringBuilder();
@@ -74,7 +74,7 @@ app.MapPost("/api/ai/query", async Task<IResult> (
             {
                 foreach (var segment in plan.Segments)
                 {
-                    ct.ThrowIfCancellationRequested();
+                    cancellationToken.ThrowIfCancellationRequested();
                     aggregate.Append(segment);
                     var chunkPayload = JsonSerializer.Serialize(
                         new AiStreamChunk
@@ -89,7 +89,7 @@ app.MapPost("/api/ai/query", async Task<IResult> (
 
                     if (plan.DelayBetweenSegments > TimeSpan.Zero)
                     {
-                        await Task.Delay(plan.DelayBetweenSegments, ct);
+                        await Task.Delay(plan.DelayBetweenSegments, cancellationToken);
                     }
                 }
 
