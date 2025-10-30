@@ -3,7 +3,8 @@ using DocumentManagementSystem.Common.Workflows;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<SharedAppStore>();
 
 var app = builder.Build();
@@ -111,7 +112,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     service = "WorkflowService",
     status = "ok",
-    limitations = WorkflowLimitations,
+    limitations = WorkflowLimitations.Value,
 }));
 
 app.Run();
@@ -137,6 +138,4 @@ internal static class WorkflowLimitations
         "Workflows are stored in-memory using a shared demo store.",
         "Persistence resets when the service restarts.",
     };
-
-    public static implicit operator IReadOnlyList<string>(WorkflowLimitations _) => Value;
 }

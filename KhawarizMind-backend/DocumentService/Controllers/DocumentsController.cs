@@ -180,8 +180,8 @@ public class DocumentsController : ControllerBase
                 DateTimeOffset.UtcNow,
                 actor,
                 action,
-                resourceType: "Document",
-                resourceId: metadata != null && metadata.TryGetValue("documentId", out var id)
+                ResourceType: "Document",
+                ResourceId: metadata != null && metadata.TryGetValue("documentId", out var id)
                     ? id
                     : string.Empty,
                 metadata),
